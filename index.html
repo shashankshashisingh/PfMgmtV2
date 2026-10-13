@@ -264,7 +264,7 @@ details>.in{padding:0 17px 17px}
     </div>
     <div class="panel">
       <h2>Portfolio value <span class="hint" id="valHint"></span></h2>
-      <div class="legend"><span><i style="background:var(--accent)"></i>Market value</span><span><i style="background:var(--bench)"></i>Net invested</span></div>
+      <div class="legend"><span><i style="background:var(--accent)"></i>Total assets</span><span><i style="background:var(--bench)"></i>Cash balance</span></div>
       <div class="chart" id="valChart"></div>
     </div>
     <div class="grid2">
@@ -287,6 +287,7 @@ details>.in{padding:0 17px 17px}
       <form class="f" id="fundForm" autocomplete="off" style="margin-top:14px">
         <label class="fl" style="grid-column:span 2">New fund name<input id="nfName" placeholder="Small Cap" required></label>
         <label class="fl" style="grid-column:span 2">Benchmark<select id="nfBench"></select></label>
+        <label class="fl">Units to create<input id="nfUnits" type="number" min="1" step="1" required placeholder="e.g. 100000"></label>
         <button class="btn" type="submit">Create fund</button>
       </form>
       <div class="msg" id="fundMsg"></div>
@@ -750,11 +751,11 @@ let S=null,DEMO_AUX=null;
 const FEED={meta:{},updated:'',dir:{},hist:null,raw:null};
 const REPO={env:'',priceCount:0,priceUpdated:'',priceErr:'',priceErrors:{},dirCount:0,dirErr:'',histCount:0,histUpdated:'',histErr:''};
 const PAGES_URL='https://shashankshashisingh.github.io/PortfolioMgmt/';
-function blank(){return {mode:'user',ver:2,txns:[],meta:{},series:{},manual:{},live:{},bench:'',rf:7,targets:{},feedUrl:'',period:'1Y',sort:{k:'value',dir:-1},nextId:1,funds:[{id:'f1',name:'Main',bench:'',totalAssets:0}],view:'ALL'}}
+function blank(){return {mode:'user',ver:2,txns:[],meta:{},series:{},manual:{},live:{},bench:'',rf:7,targets:{},feedUrl:'',period:'1Y',sort:{k:'value',dir:-1},nextId:1,funds:[{id:'f1',name:'Main',bench:'',totalAssets:0,units:100000}],view:'ALL'}}
 function demoState(){
   const d=buildDemo();DEMO_AUX={beta:d.beta,idio:d.idio,fixed:d.fixed};
   return {mode:'demo',ver:2,txns:d.txns,meta:d.meta,series:d.series,manual:{},live:{},bench:'NIFTY50',rf:7,targets:{ALL:Object.assign({},DEMO_TARGETS)},feedUrl:'',period:'1Y',sort:{k:'value',dir:-1},nextId:d.txns.length+1,
-    funds:[{id:'f1',name:'Large Cap',bench:'NIFTY50'},{id:'f2',name:'Mid Cap',bench:'NIFTYMID150'},{id:'f3',name:'Small Cap',bench:'NIFTYSMALL250'},{id:'f4',name:'Defensive',bench:''}],view:'ALL'};
+    funds:[{id:'f1',name:'Large Cap',bench:'NIFTY50',totalAssets:10000000,units:100000},{id:'f2',name:'Mid Cap',bench:'NIFTYMID150',totalAssets:10000000,units:100000},{id:'f3',name:'Small Cap',bench:'NIFTYSMALL250',totalAssets:10000000,units:100000},{id:'f4',name:'Defensive',bench:'',totalAssets:10000000,units:100000}],view:'ALL'};
 }
 function normalize(){
   if(!S.targets)S.targets={};
@@ -762,8 +763,8 @@ function normalize(){
   if(tk0.length&&typeof S.targets[tk0[0]]==='number')S.targets={ALL:S.targets};
   for(const s in S.meta){const m=S.meta[s];if(m&&m.cls&&m.cls!=='Index'){m.cls=normClass(m.cls)||'Other'}}
   for(const v in S.targets){const t=S.targets[v];if(t&&typeof t==='object'){const o={};for(const c in t){const k=normClass(c)||c;o[k]=(o[k]||0)+t[c]}S.targets[v]=o}}
-  if(!Array.isArray(S.funds)||!S.funds.length)S.funds=[{id:'f1',name:'Main',bench:'',totalAssets:0}];
-  for(const f of S.funds){const a=Number(f.totalAssets);f.totalAssets=Number.isFinite(a)&&a>=0?a:0;}
+  if(!Array.isArray(S.funds)||!S.funds.length)S.funds=[{id:'f1',name:'Main',bench:'',totalAssets:0,units:100000}];
+  for(const f of S.funds){const a=Number(f.totalAssets);f.totalAssets=Number.isFinite(a)&&a>=0?a:0;const u=Number(f.units);f.units=Number.isInteger(u)&&u>0?u:100000;}
   for(const t of S.txns)if(!t.fund||!S.funds.some(f=>f.id===t.fund))t.fund=S.funds[0].id;
   const tk=Object.keys(S.targets||{});
   if(tk.length&&typeof S.targets[tk[0]]==='number')S.targets={ALL:S.targets};
@@ -848,7 +849,7 @@ function compute(){
     for(let i=0;i<arr.length&&arr[i]==null;i++)arr[i]=c[0];
     px[s]=arr;
   }
-  if(!dates.length){C={dates,px,n:0,book:{},pos:[],held:[],total:0,ps:{value:[],flow:[],invested:[],ret:[],idx:[],start:-1},txns:[],ist};return}
+  if(!dates.length){C={dates,px,n:0,book:{},pos:[],held:[],total:0,ps:{value:[],flow:[],invested:[],ret:[],idx:[],start:-1},txns:[],ist};const af=S.view==='ALL'?null:S.funds.find(f=>f.id===S.view);C.account=fundAccountSeries(viewTxns(),dates,px,af?(af.totalAssets||0):sum(S.funds.map(f=>Number(f.totalAssets)||0)),af?(af.units||100000):sum(S.funds.map(f=>Number(f.units)||100000)));return}
   const lastHist=dates[dates.length-1];
   const manualOn=Object.keys(S.manual).length>0;
   const liveOn=hasLive&&ist.date>lastHist&&((ist.trading&&ist.started)||manualOn);
@@ -857,6 +858,12 @@ function compute(){
   const n=dates.length;
   for(const s in px)if(S.series[s].d.length<=2&&L[s]!=null)px[s][n-1]=L[s];
   C=Object.assign({dates,px,n,ist,liveOn,L},analyze(viewTxns(),px,dates,n));
+  const activeFund=S.view==='ALL'?null:S.funds.find(f=>f.id===S.view);
+  const accountAum=activeFund?(Number(activeFund.totalAssets)||0):sum(S.funds.map(f=>Number(f.totalAssets)||0));
+  const accountUnits=activeFund?(Number(activeFund.units)||100000):sum(S.funds.map(f=>Number(f.units)||100000));
+  C.account=fundAccountSeries(viewTxns(),dates,px,accountAum,accountUnits);
+  C.ps.ret=C.account.ret;C.ps.idx=C.account.idx;C.ps.start=C.account.start;
+  for(const p of C.pos)p.w=C.account.assetsNow>0?p.value/C.account.assetsNow:0;
 }
 function totals(A){
   A=A||C;
@@ -967,19 +974,41 @@ function renderPeriod(){
   el.innerHTML='<span class="lbl">Period</span>'+PERIODS.map(p=>'<button class="chip" data-per="'+p+'" aria-pressed="'+(S.period===p)+'">'+p+'</button>').join('');
 }
 function emptyMsg(){return '<div class="empty">No holdings yet. Add a transaction on the Holdings tab or import a CSV on the Data tab.</div>'}
-const FUND_CORPUS=10000000;
-const FUND_UNITS=100000;
+function fundAccountSeries(txns,dates,px,totalAssets,units){
+  const aum=Math.max(0,Number(totalAssets)||0),unitCount=Math.max(1,Number(units)||100000);
+  const sorted=sortTxns(txns),n=dates.length,qty={},cash=[],assets=[],market=[],margin=[],returns=[],idx=[];
+  let ti=0,cashBalance=aum;
+  for(let i=0;i<n;i++){
+    while(ti<sorted.length&&sorted[ti].date<=dates[i]){
+      const t=sorted[ti],q=Number(t.qty)||0,notional=q*(Number(t.price)||0);
+      if(t.type==='BUY'){qty[t.symbol]=(qty[t.symbol]||0)+q;cashBalance-=notional}
+      else if(t.type==='SELL'){qty[t.symbol]=(qty[t.symbol]||0)-q;cashBalance+=notional}
+      else if(t.type==='SHORT'){qty[t.symbol]=(qty[t.symbol]||0)-q;cashBalance+=notional}
+      else if(t.type==='COVER'){qty[t.symbol]=(qty[t.symbol]||0)+q;cashBalance-=notional}
+      ti++;
+    }
+    let mv=0,shortNotional=0;
+    for(const s in qty){const p=px[s],price=p&&p[i]!=null?Number(p[i]):0,q=qty[s];mv+=q*price;if(q< -1e-9)shortNotional+=Math.abs(q)*price}
+    cash.push(cashBalance);market.push(mv);assets.push(cashBalance+mv);margin.push(shortNotional*1.15);
+  }
+  let start=-1;for(let i=0;i<n;i++)if(assets[i]>0){start=i;break}
+  for(let i=0;i<n;i++){returns.push(null);idx.push(null)}
+  if(start>=0){idx[start]=100;for(let i=start+1;i<n;i++){if(assets[i-1]>0){returns[i]=assets[i]/assets[i-1]-1;idx[i]=idx[i-1]*(1+returns[i])}else idx[i]=idx[i-1]}}
+  const last=n-1,assetsNow=n?assets[last]:aum,cashNow=n?cash[last]:aum,marginNow=n?margin[last]:0;
+  const returnPct=aum>0?assetsNow/aum-1:NaN;
+  let annualized=NaN;
+  if(n>1&&aum>0&&assetsNow>0&&Date.parse(dates[last])>Date.parse(dates[0]))annualized=xirr([{t:Date.parse(dates[0]+'T00:00:00Z'),amt:-aum},{t:Date.parse(dates[last]+'T00:00:00Z'),amt:assetsNow}]);
+  return {totalAssets:aum,units:unitCount,startNav:aum/unitCount,cash,market,assets,margin,ret:returns,idx,start,nav:assets.map(v=>v/unitCount),
+    cashNow,assetsNow,marginNow,availableCash:cashNow-marginNow,returnPct,annualized,dayPnl:n>1?assets[last]-assets[last-1]:0,
+    dayPct:n>1&&assets[last-1]>0?assets[last]/assets[last-1]-1:0};
+}
 function fundNavData(){
   return S.funds.map((f,i)=>{
-    const tx=S.txns.filter(t=>t.fund===f.id);
-    const A=analyze(tx,C.px,C.dates,C.n);
-    const cash=A.ps.invested.map(v=>FUND_CORPUS-v);
-    const assets=A.ps.value.map((v,j)=>v+cash[j]);
-    const nav=assets.map(v=>v/FUND_UNITS);
-    const last=Math.max(0,nav.length-1);
-    return {f,i,tx,A,cash,assets,nav,current:nav.length?nav[last]:100,
-      cashNow:cash.length?cash[last]:FUND_CORPUS,assetsNow:assets.length?assets[last]:FUND_CORPUS,marginNow:A.shortMargin||0,availableCash:(cash.length?cash[last]:FUND_CORPUS)-(A.shortMargin||0),
-      returnPct:(nav.length?nav[last]/100-1:0)};
+    const tx=S.txns.filter(t=>t.fund===f.id),A=analyze(tx,C.px,C.dates,C.n);
+    const account=fundAccountSeries(tx,C.dates,C.px,f.totalAssets,f.units);
+    return {f,i,tx,A,account,cash:account.cash,assets:account.assets,nav:account.nav,
+      current:account.nav.length?account.nav[account.nav.length-1]:account.startNav,
+      cashNow:account.cashNow,assetsNow:account.assetsNow,marginNow:account.marginNow,availableCash:account.availableCash,returnPct:account.returnPct};
   });
 }
 function renderNav(){
@@ -990,12 +1019,13 @@ function renderNav(){
     '<div class="panel" style="padding:12px;border-color:var(--line)">'+
       '<div class="k">'+esc(r.f.name)+'</div>'+
       '<div class="v big '+sg(r.current-100)+'">'+inr(r.current,2)+'</div>'+
-      '<div class="s '+sg(r.returnPct)+'">'+pcS(r.returnPct)+' since ₹100 start</div>'+
-      '<div class="note" style="display:flex;justify-content:space-between;gap:8px"><span>Assets</span><b class="mono">'+inrC(r.assetsNow)+'</b></div>'+
+      '<div class="s '+sg(r.returnPct)+'">'+pcS(r.returnPct)+' vs starting AUM</div>'+
+      '<div class="note" style="display:flex;justify-content:space-between;gap:8px"><span>Total assets</span><b class="mono">'+inrC(r.assetsNow)+'</b></div>'+
+      '<div class="note" style="display:flex;justify-content:space-between;gap:8px;margin-top:2px"><span>Starting AUM</span><b class="mono">'+inrC(r.f.totalAssets||0)+'</b></div>'+
       '<div class="note" style="display:flex;justify-content:space-between;gap:8px;margin-top:2px"><span>Cash balance</span><b class="mono">'+inrC(r.cashNow)+'</b></div>'+
       '<div class="note" style="display:flex;justify-content:space-between;gap:8px;margin-top:2px"><span>Short margin (115%)</span><b class="mono">'+inrC(r.marginNow)+'</b></div>'+
       '<div class="note" style="display:flex;justify-content:space-between;gap:8px;margin-top:2px"><span>Cash after margin</span><b class="mono">'+inrC(r.availableCash)+'</b></div>'+
-      '<div class="note" style="display:flex;justify-content:space-between;gap:8px;margin-top:2px"><span>Units</span><b class="mono">'+nf0.format(FUND_UNITS)+'</b></div>'+
+      '<div class="note" style="display:flex;justify-content:space-between;gap:8px;margin-top:2px"><span>Units</span><b class="mono">'+nf0.format(r.f.units||100000)+'</b></div>'+
     '</div>'
   ).join('');
   $('#navLegend').innerHTML=shown.map(r=>'<span><i style="background:'+color(r.i)+'"></i>'+esc(r.f.name)+'</span>').join('');
@@ -1012,30 +1042,29 @@ function renderNav(){
 }
 function renderToday(){
   renderNav();
-  const T=totals(),h=C.held;
-  if(!h.length){$('#kpis').innerHTML='';$('#valChart').innerHTML=emptyMsg();$('#allocBox').innerHTML=emptyMsg();$('#movers').innerHTML=emptyMsg();return}
-  const totalRet=T.unreal+T.realised;
+  const T=totals(),h=C.held,account=C.account;
+  if(!h.length&&!(account&&account.totalAssets>0)){$('#kpis').innerHTML='';$('#valChart').innerHTML=emptyMsg();$('#allocBox').innerHTML=emptyMsg();$('#movers').innerHTML=emptyMsg();return}
+  const displayValue=account?account.assetsNow:T.value,dayPnl=account?account.dayPnl:T.dayPnl,dayPct=account?account.dayPct:T.dayPct;
+  const totalRet=account?account.assetsNow-account.totalAssets:T.unreal+T.realised,xirrValue=account?account.annualized:T.xirr;
   $('#kpis').innerHTML=
-    '<div><div class="k">Current value</div><div class="v big">'+inrC(T.value)+'</div><div class="s muted">'+inr(T.value)+'</div></div>'+
-    '<div><div class="k">Today</div><div class="v '+sg(T.dayPnl)+'">'+inrS(T.dayPnl)+'</div><div class="s '+sg(T.dayPnl)+'">'+pcS(T.dayPct)+'</div></div>'+
-    '<div><div class="k">Total profit</div><div class="v '+sg(totalRet)+'">'+inrS(totalRet)+'</div><div class="s muted">Unrealised '+inrS(T.unreal)+' · Realised '+inrS(T.realised)+'</div></div>'+
-    '<div><div class="k">XIRR</div><div class="v '+sg(T.xirr)+'">'+pcS(T.xirr,1)+'</div><div class="s muted">annualised, cash-flow weighted</div></div>';
-  const from=range(),ps=C.ps,d=slice(C.dates,from);
+    '<div><div class="k">Net assets · incl. cash</div><div class="v big">'+inrC(displayValue)+'</div><div class="s muted">Starting AUM '+inrC(account?account.totalAssets:0)+'</div></div>'+
+    '<div><div class="k">Today</div><div class="v '+sg(dayPnl)+'">'+inrS(dayPnl)+'</div><div class="s '+sg(dayPnl)+'">'+pcS(dayPct)+'</div></div>'+
+    '<div><div class="k">Profit / loss vs AUM</div><div class="v '+sg(totalRet)+'">'+inrS(totalRet)+'</div><div class="s muted">'+pcS(account?account.returnPct:NaN)+' return on starting AUM</div></div>'+
+    '<div><div class="k">XIRR</div><div class="v '+sg(xirrValue)+'">'+pcS(xirrValue,1)+'</div><div class="s muted">annualised, AUM-based</div></div>';
+  const from=range(),d=slice(C.dates,from),acctAssets=account?account.assets:[],acctCash=account?account.cash:[];
   $('#valHint').textContent=d.length?fmtD(d[0])+' to '+fmtD(d[d.length-1]):'';
-  lineChart($('#valChart'),d,[
-    {name:'Net invested',color:'var(--bench)',vals:slice(ps.invested,from),dash:true,w:1.6},
-    {name:'Market value',color:'var(--accent)',vals:slice(ps.value,from),area:true}
-  ],{yf:inrC,label:'Portfolio value over time',yw:70});
-  // allocation
+  lineChart($('#valChart'),d,[{name:'Total assets',color:'var(--accent)',vals:slice(acctAssets,from),area:true},{name:'Cash balance',color:'var(--bench)',vals:slice(acctCash,from),dash:true,w:1.6}],{yf:inrC,label:'Fund net assets and cash over time',yw:70});
   const by={};for(const p of h)by[p.cls]=(by[p.cls]||0)+p.value;
-  const rows=Object.entries(by).sort((a,b)=>b[1]-a[1]);
-  $('#allocBox').innerHTML='<div class="alloc">'+rows.map(r=>'<span style="width:'+(r[1]/T.value*100).toFixed(2)+'%;background:'+clsColor(r[0])+'" title="'+esc(r[0])+'"></span>').join('')+'</div>'+
-    rows.map(r=>'<div class="row" style="grid-template-columns:auto 1fr auto auto"><span class="swatch" style="background:'+clsColor(r[0])+';margin:0"></span><span class="nm">'+esc(r[0])+'</span><span class="mono muted">'+inrC(r[1])+'</span><span class="mono" style="min-width:56px;text-align:right">'+pc(r[1]/T.value,1)+'</span></div>').join('');
-  // movers
+  const denominator=account&&account.assetsNow>0?account.assetsNow:T.value;
+  const allocation=Object.entries(by).map(([name,value])=>({name,value,color:clsColor(name)}));
+  if(account)allocation.push({name:'Cash',value:account.cashNow,color:'var(--bench)'});
+  allocation.sort((a,b)=>b.value-a.value);
+  $('#allocBox').innerHTML=allocation.length?'<div class="alloc">'+allocation.map(r=>'<span style="width:'+Math.max(0,denominator>0?r.value/denominator*100:0).toFixed(2)+'%;background:'+r.color+'" title="'+esc(r.name)+'"></span>').join('')+'</div>'+
+    allocation.map(r=>'<div class="row" style="grid-template-columns:auto 1fr auto auto"><span class="swatch" style="background:'+r.color+';margin:0"></span><span class="nm">'+esc(r.name)+'</span><span class="mono muted">'+inrC(r.value)+'</span><span class="mono" style="min-width:56px;text-align:right">'+pc(denominator>0?r.value/denominator:NaN,1)+'</span></div>').join(''):'<div class="empty">No allocation data yet.</div>';
   const mv=h.slice().sort((a,b)=>Math.abs(b.dayPnl)-Math.abs(a.dayPnl)).slice(0,6);
+  if(!mv.length){$('#movers').innerHTML=emptyMsg();return}
   const mx=Math.max(...mv.map(p=>Math.abs(p.dayPnl)),1);
-  $('#movers').innerHTML=mv.map(p=>'<div class="row" style="grid-template-columns:1fr auto auto"><span class="nm"><b>'+esc(p.s)+'</b> <span class="muted">'+esc(p.cls)+'</span></span><span class="mono '+sg(p.dayPnl)+'">'+pcS(p.dayPct)+'</span><span class="mono '+sg(p.dayPnl)+'" style="min-width:84px;text-align:right">'+inrS(p.dayPnl)+'</span>'
-    +'<div class="bar"><i style="background:var(--'+(p.dayPnl>=0?'gain':'loss')+');left:0;width:'+(Math.abs(p.dayPnl)/mx*100).toFixed(1)+'%"></i></div></div>').join('');
+  $('#movers').innerHTML=mv.map(p=>'<div class="row" style="grid-template-columns:1fr auto auto"><span class="nm"><b>'+esc(p.s)+'</b> <span class="muted">'+esc(p.cls)+'</span></span><span class="mono '+sg(p.dayPnl)+'">'+pcS(p.dayPct)+'</span><span class="mono '+sg(p.dayPnl)+'" style="min-width:84px;text-align:right">'+inrS(p.dayPnl)+'</span><div class="bar"><i style="background:var(--'+(p.dayPnl>=0?'gain':'loss')+');left:0;width:'+(Math.abs(p.dayPnl)/mx*100).toFixed(1)+'%"></i></div></div>').join('');
 }
 function spark(vals){
   const v=vals.filter(x=>x!=null);if(v.length<2)return '';
@@ -1111,46 +1140,45 @@ function renderFundbar(){
 function fundRows(){
   const rf=S.rf/100;
   const mk=(f,tx,b)=>{
-    const A=analyze(tx,C.px,C.dates,C.n),T=totals(A),D=periodDataFor(A,b);
-    return {f,A,T,b,count:tx.length,st:perfStats(D.pr,rf),rel:D.br?relStats(D.pr,D.br,rf):{},sb:D.br?perfStats(D.br,rf):{}};
+    const A=analyze(tx,C.px,C.dates,C.n),account=fundAccountSeries(tx,C.dates,C.px,f.totalAssets||0,f.units||100000);
+    A.ps.ret=account.ret;A.ps.idx=account.idx;A.ps.start=account.start;
+    const T=totals(A),D=periodDataFor(A,b);
+    return {f,A,T,b,count:tx.length,account,st:perfStats(D.pr,rf),rel:D.br?relStats(D.pr,D.br,rf):{},sb:D.br?perfStats(D.br,rf):{}};
   };
   const rows=S.funds.map(f=>mk(f,S.txns.filter(t=>t.fund===f.id),benchFor(f.id)));
-  const all=mk({id:'ALL',name:'All funds'},S.txns,benchFor('ALL'));
+  const allAum=sum(S.funds.map(f=>Number(f.totalAssets)||0)),allUnits=sum(S.funds.map(f=>Number(f.units)||100000));
+  const all=mk({id:'ALL',name:'All funds',totalAssets:allAum,units:allUnits},S.txns,benchFor('ALL'));
   return {rows,all};
 }
 function renderFunds(){
   if(!C.n){$('#fundTable').innerHTML=emptyMsg();$('#fundAlloc').innerHTML='';return}
   const {rows,all}=fundRows();
-  $('#fundHint').textContent='period: '+S.period;
-  const tot=all.T.value;
-  $('#fundAlloc').innerHTML=tot>0?'<div class="alloc">'+rows.map((r,i)=>'<span style="width:'+(r.T.value/tot*100).toFixed(2)+'%;background:var(--c'+(i%7+1)+')" title="'+esc(r.f.name)+'"></span>').join('')+'</div>':'';
+  $('#fundHint').textContent='period: '+S.period+' · returns calculated on AUM including cash';
+  const totalAssetsNow=sum(rows.map(r=>r.account.assetsNow));
+  $('#fundAlloc').innerHTML=totalAssetsNow>0?'<div class="alloc">'+rows.map((r,i)=>'<span style="width:'+Math.max(0,r.account.assetsNow/totalAssetsNow*100).toFixed(2)+'%;background:var(--c'+(i%7+1)+')" title="'+esc(r.f.name)+' · '+inrC(r.account.assetsNow)+'"></span>').join('')+'</div>':'';
   const cell=(r,i)=>{
-    const has=r.T.value>0||r.count>0,T=r.T,st=r.st,ex=has&&isFinite(st.total)&&isFinite(r.sb.total)?st.total-r.sb.total:NaN;
+    const has=r.account.assetsNow>0||r.count>0,T=r.T,st=r.st,ex=has&&isFinite(st.total)&&isFinite(r.sb.total)?st.total-r.sb.total:NaN;
     const nameCell=i>=0?'<span class="swatch" style="background:var(--c'+(i%7+1)+')"></span><button class="chip" data-fundsel="'+esc(r.f.id)+'">'+esc(r.f.name)+'</button>':'<b>All funds</b>';
-    const assetBase=i<0?sum(rows.map(x=>Number(x.f.totalAssets)||0)):(Number(r.f.totalAssets)||0);
+    const aum=Number(r.f.totalAssets)||0,acc=r.account;
     const longValue=sum((r.A.held||[]).filter(p=>p.side!=='SHORT').map(p=>p.value));
-    const marginUsed=longValue+(r.A.shortMargin||0);
-    const remaining=assetBase-marginUsed;
+    const used=longValue+(acc.marginNow||0),share=totalAssetsNow>0?acc.assetsNow/totalAssetsNow:NaN;
     return '<tr'+(i<0?' style="font-weight:600"':'')+'><td>'+nameCell+'</td><td>'+esc(r.b||'—')+'</td>'+
-      '<td class="n">'+(has?inrC(T.value):'—')+'</td><td class="n">'+(tot>0&&has?pc(T.value/tot,1):'—')+'</td>'+
-      '<td class="n">'+(assetBase>0?inrC(assetBase):'—')+'</td><td class="n">'+(assetBase>0?inrC(marginUsed):'—')+'</td><td class="n '+(remaining<0?'loss':'')+'">'+(assetBase>0?inrS(remaining):'—')+'</td>'+
-      '<td class="n '+sg(T.dayPnl)+'">'+(has?pcS(T.dayPct):'—')+'</td>'+
-      '<td class="n '+sg(st.total)+'">'+pcS(st.total)+'</td><td class="n '+sg(ex)+'">'+pcS(ex)+'</td>'+
-      '<td class="n '+sg(T.xirr)+'">'+pcS(T.xirr,1)+'</td><td class="n">'+pc(st.vol)+'</td><td class="n">'+nm(st.sharpe)+'</td>'+
-      '<td class="n loss">'+(isFinite(st.mdd)?pc(st.mdd):'—')+'</td><td class="n">'+nm(r.rel.beta)+'</td><td class="n '+sg(r.rel.alpha)+'">'+pcS(r.rel.alpha)+'</td></tr>';
+      '<td class="n">'+inrC(acc.assetsNow)+'</td><td class="n">'+pc(share,1)+'</td><td class="n">'+(aum>0?inrC(aum):'—')+'</td>'+
+      '<td class="n">'+inrC(acc.cashNow)+'</td><td class="n">'+inrC(used)+'</td><td class="n '+(acc.availableCash<0?'loss':'')+'">'+inrS(acc.availableCash)+'</td>'+
+      '<td class="n '+sg(acc.dayPnl)+'">'+inrS(acc.dayPnl)+' <span class="muted">('+pcS(acc.dayPct,1)+')</span></td>'+
+      '<td class="n '+sg(st.total)+'">'+pcS(st.total)+'</td><td class="n '+sg(ex)+'">'+pcS(ex)+'</td><td class="n '+sg(acc.annualized)+'">'+pcS(acc.annualized,1)+'</td>'+
+      '<td class="n">'+pc(st.vol)+'</td><td class="n">'+nm(st.sharpe)+'</td><td class="n loss">'+(isFinite(st.mdd)?pc(st.mdd):'—')+'</td>'+
+      '<td class="n">'+nm(r.rel.beta)+'</td><td class="n '+sg(r.rel.alpha)+'">'+pcS(r.rel.alpha)+'</td></tr>';
   };
-  $('#fundTable').innerHTML='<table><thead><tr><th>Fund</th><th>Benchmark</th><th class="n">Value</th><th class="n">Share</th><th class="n">Today</th><th class="n">Return</th><th class="n">vs bench</th><th class="n">XIRR</th><th class="n">Volatility</th><th class="n">Sharpe</th><th class="n">Max drawdown</th><th class="n">Beta</th><th class="n">Alpha</th></tr></thead><tbody>'+
-    rows.map((r,i)=>cell(r,i)).join('')+cell(all,-1)+'</tbody></table>';
-  // management
-  const cands=benchCandidates();
-  const opt=sel=>'<option value="">Default ('+esc(S.bench||'none')+')</option>'+cands.map(c=>'<option value="'+esc(c)+'"'+(c===sel?' selected':'')+'>'+esc(((S.meta[c]||{}).name||c))+'</option>').join('');
+  $('#fundTable').innerHTML='<table><thead><tr><th>Fund</th><th>Benchmark</th><th class="n">Net assets</th><th class="n">Weight</th><th class="n">Starting AUM</th><th class="n">Cash</th><th class="n">Used / margin</th><th class="n">Available cash</th><th class="n">Today</th><th class="n">Return</th><th class="n">vs bench</th><th class="n">XIRR</th><th class="n">Volatility</th><th class="n">Sharpe</th><th class="n">Max drawdown</th><th class="n">Beta</th><th class="n">Alpha</th></tr></thead><tbody>'+rows.map((r,i)=>cell(r,i)).join('')+cell(all,-1)+'</tbody></table>';
+  const cands=benchCandidates(),opt=sel=>'<option value="">Default ('+esc(S.bench||'none')+')</option>'+cands.map(c=>'<option value="'+esc(c)+'"'+(c===sel?' selected':'')+'>'+esc(((S.meta[c]||{}).name||c))+'</option>').join('');
   $('#fundMgmt').innerHTML=S.funds.map(f=>{
     const n=S.txns.filter(t=>t.fund===f.id).length;
     return '<div class="cols" style="align-items:center;margin-bottom:8px"><input data-fname="'+esc(f.id)+'" value="'+esc(f.name)+'" aria-label="Fund name" style="flex:2 1 160px">'+
       '<select data-fbench="'+esc(f.id)+'" aria-label="Benchmark for '+esc(f.name)+'" style="flex:2 1 160px">'+opt(f.bench)+'</select>'+
-      '<label class="fl" style="flex:2 1 180px">Total asset amount (₹)<input type="number" min="0" step="any" data-ftotal="'+esc(f.id)+'" value="'+(f.totalAssets||0)+'" aria-label="Total asset amount for '+esc(f.name)+'" placeholder="Enter total assets"></label>'+
-      '<span class="muted" style="flex:0 0 90px">'+n+' trades</span>'+
-      '<button class="btn ghost sm" data-fdel="'+esc(f.id)+'" style="flex:0 0 auto">Delete</button></div>';
+      '<label class="fl" style="flex:2 1 180px">Starting AUM (₹)<input type="number" min="0" step="any" data-ftotal="'+esc(f.id)+'" value="'+(f.totalAssets||0)+'" aria-label="Starting AUM for '+esc(f.name)+'" placeholder="Enter AUM"></label>'+
+      '<label class="fl" style="flex:1 1 130px">NAV units<input type="number" min="1" step="1" data-funits="'+esc(f.id)+'" value="'+(f.units||100000)+'" aria-label="NAV units for '+esc(f.name)+'"></label>'+
+      '<span class="muted" style="flex:0 0 90px">'+n+' trades</span><button class="btn ghost sm" data-fdel="'+esc(f.id)+'" style="flex:0 0 auto">Delete</button></div>';
   }).join('');
   $('#nfBench').innerHTML=opt('');
 }
@@ -1445,7 +1473,7 @@ function importCSV(text){
   const fundOf=nm=>{
     nm=String(nm||'').trim();if(!nm)return defFund();
     let f=S.funds.find(x=>x.name.toLowerCase()===nm.toLowerCase());
-    if(!f){f={id:newFundId(),name:nm,bench:''};S.funds.push(f)}
+    if(!f){f={id:newFundId(),name:nm,bench:'',totalAssets:0,units:100000};S.funds.push(f)}
     return f.id;
   };
   if(isTx){
@@ -1559,7 +1587,8 @@ document.addEventListener('change',e=>{
   if(t.id==='benchSel'){const f=S.funds.find(x=>x.id===S.view);if(f)f.bench=t.value;else S.bench=t.value;save();renderBench()}
   if(t.dataset&&t.dataset.fname!==undefined){const f=S.funds.find(x=>x.id===t.dataset.fname),v=t.value.trim();if(f&&v&&S.mode==='user'){f.name=v;save();renderAll()}else if(S.mode==='demo'){msg($('#fundMsg'),'This is the example portfolio. Import your holdings or start empty before changing funds.','err');renderFunds()}}
   if(t.dataset&&t.dataset.fbench!==undefined){const f=S.funds.find(x=>x.id===t.dataset.fbench);if(f&&S.mode==='user'){f.bench=t.value;save();renderAll()}else if(S.mode==='demo'){msg($('#fundMsg'),'This is the example portfolio. Import your holdings or start empty before changing funds.','err');renderFunds()}}
-  if(t.dataset&&t.dataset.ftotal!==undefined){const f=S.funds.find(x=>x.id===t.dataset.ftotal),v=t.value.trim()===''?0:Number(t.value);if(f&&S.mode==='user'&&Number.isFinite(v)&&v>=0){f.totalAssets=v;save();msg($('#fundMsg'),'Total asset amount saved for '+f.name+'.','ok')}else if(S.mode==='demo'){msg($('#fundMsg'),'This is the example portfolio. Import your holdings or start empty before changing fund settings.','err');renderFunds()}else if(!Number.isFinite(v)||v<0){msg($('#fundMsg'),'Enter a valid amount of zero or more.','err')}}
+  if(t.dataset&&t.dataset.ftotal!==undefined){const f=S.funds.find(x=>x.id===t.dataset.ftotal),v=t.value.trim()===''?0:Number(t.value);if(f&&S.mode==='user'&&Number.isFinite(v)&&v>=0){f.totalAssets=v;save();msg($('#fundMsg'),'Starting AUM saved for '+f.name+'. NAV and returns now use this corpus.','ok');renderAll()}else if(S.mode==='demo'){msg($('#fundMsg'),'This is the example portfolio. Import your holdings or start empty before changing fund settings.','err');renderFunds()}else if(!Number.isFinite(v)||v<0){msg($('#fundMsg'),'Enter a valid amount of zero or more.','err')}}
+  if(t.dataset&&t.dataset.funits!==undefined){const f=S.funds.find(x=>x.id===t.dataset.funits),v=Number(t.value);if(f&&S.mode==='user'&&Number.isInteger(v)&&v>0){f.units=v;save();msg($('#fundMsg'),'NAV units saved for '+f.name+'. Starting NAV is AUM divided by units.','ok');renderAll()}else if(S.mode==='demo'){msg($('#fundMsg'),'This is the example portfolio. Import your holdings or start empty before changing fund settings.','err');renderFunds()}else{msg($('#fundMsg'),'Enter a whole number of units greater than zero.','err')}}
   if(t.id==='rfIn'){const v=parseFloat(t.value);if(isFinite(v)&&v>=0){S.rf=v;save();renderBench()}}
   if(t.dataset&&t.dataset.target!==undefined){const v=parseFloat(t.value);const TG=S.targets[S.view]||(S.targets[S.view]={});if(isFinite(v))TG[t.dataset.target]=v;else delete TG[t.dataset.target];save();renderRebalance()}
 });
@@ -1775,7 +1804,8 @@ $('#txnForm').addEventListener('submit',e=>{
   if(type==='BUY'&&shortHeld>1e-9){msg(M,'This symbol is currently short. Use Cover short to close it.','err');return}
   if(type==='SHORT'){
     const existingMargin=sum(Object.keys(book).map(k=>sum((book[k].shortLots||[]).map(l=>l.qty))*((marketPriceFor(k)||{}).price||price)*1.15));
-    const cashNow=FUND_CORPUS-fundTx.reduce((acc,t)=>acc+(['BUY','COVER'].includes(t.type)?1:-1)*t.qty*t.price,0);
+    const fundConfig=S.funds.find(f=>f.id===fund)||{totalAssets:0};
+    const cashNow=(Number(fundConfig.totalAssets)||0)-fundTx.reduce((acc,t)=>acc+(['BUY','COVER'].includes(t.type)?1:-1)*t.qty*t.price,0);
     const availableAfter=cashNow+qty*price-existingMargin-qty*price*1.15;
     if(availableAfter< -1e-9){msg(M,'Insufficient available cash for 115% short margin. Required for this trade: '+inr(qty*price*1.15)+'.','err');return}
   }
@@ -1796,12 +1826,13 @@ $('#txnForm').addEventListener('submit',e=>{
 });
 $('#fundForm').addEventListener('submit',e=>{
   e.preventDefault();
-  const M=$('#fundMsg'),name=$('#nfName').value.trim();
+  const M=$('#fundMsg'),name=$('#nfName').value.trim(),units=Number($('#nfUnits').value);
   if(S.mode==='demo'){msg(M,'This is the example portfolio. Import your holdings or start empty before creating funds.','err');return}
   if(!name){msg(M,'Enter a fund name.','err');return}
+  if(!Number.isInteger(units)||units<=0){msg(M,'Enter a whole number of NAV units greater than zero.','err');return}
   if(S.funds.some(f=>f.name.toLowerCase()===name.toLowerCase())){msg(M,'A fund with that name exists.','err');return}
-  S.funds.push({id:newFundId(),name,bench:$('#nfBench').value});save();
-  $('#nfName').value='';msg(M,'Created '+name+'. Choose it in the transaction form to add holdings.','ok');renderAll();
+  S.funds.push({id:newFundId(),name,bench:$('#nfBench').value,totalAssets:0,units});save();
+  $('#nfName').value='';$('#nfUnits').value='';msg(M,'Created '+name+' with '+nf0.format(units)+' NAV units. Set its starting AUM in Fund settings.','ok');renderAll();
 });
 $('#priceForm').addEventListener('submit',e=>{
   e.preventDefault();
