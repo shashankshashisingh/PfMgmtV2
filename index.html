@@ -739,7 +739,7 @@ function renderStatus(){
 }
 function renderBanner(){
   if(S.mode==='demo'){
-    $('#banner').innerHTML='<div class="banner"><span><b>Example portfolio.</b> Every price and holding here is simulated. Replace it with your own holdings to start tracking.</span><span style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="goData">Import my holdings</button><button class="btn ghost" id="startBlank">Start empty</button></span></div>';
+    $('#banner').innerHTML='<div class="banner"><span><b>Example portfolio.</b> Holdings are illustrative; NSE Bhavcopy closing prices are used where available, with simulated fallback for unmatched symbols. Replace the example holdings to track your own portfolio.</span><span style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="goData">Import my holdings</button><button class="btn ghost" id="startBlank">Start empty</button></span></div>';
   }else $('#banner').innerHTML='';
 }
 function renderPeriod(){
