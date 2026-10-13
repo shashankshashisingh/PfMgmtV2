@@ -137,6 +137,63 @@ section[hidden]{display:none!important}
 .account-card .account-link{background:none;border:0;color:var(--accent);text-decoration:underline;cursor:pointer;font:inherit;font-size:12px;padding:5px}
 @media(max-width:640px){.account-actions{justify-content:flex-start}.account-card{padding:18px}}
 
+
+/* ---------- visual polish: calm, premium portfolio terminal ---------- */
+:root{--bg:#F4F7F5;--surface:#FFFFFF;--ink:#172721;--muted:#66756E;--line:#E0E8E3;--soft:#F0F5F1;--accent:#087F68;--accent-ink:#FFFFFF;--gain:#16834A;--loss:#C44545}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0B1210;--surface:#121C18;--ink:#E8F0EB;--muted:#9AAEA4;--line:#263831;--soft:#18251F;--accent:#55D5B5;--accent-ink:#092019}}
+:root[data-theme="dark"]{--bg:#0B1210;--surface:#121C18;--ink:#E8F0EB;--muted:#9AAEA4;--line:#263831;--soft:#18251F;--accent:#55D5B5;--accent-ink:#092019}
+html{scroll-behavior:smooth}
+body{background:radial-gradient(ellipse at 8% -8%,rgba(8,127,104,.075),transparent 38rem),var(--bg);padding-top:clamp(20px,3.2vw,38px);letter-spacing:-.008em}
+.app{max-width:1320px;gap:20px}
+.top{align-items:center;padding:4px 2px 12px}
+.top h1{font-size:clamp(25px,3vw,34px);letter-spacing:-.045em;line-height:1.15}
+.top .sub{margin-top:7px;font-size:13.5px}
+.status{gap:10px}
+.pill{box-shadow:0 1px 2px rgba(20,45,35,.035);padding:5px 11px}
+.tabs{gap:5px;border:1px solid var(--line);border-radius:12px;padding:5px;background:var(--surface);box-shadow:0 4px 16px rgba(22,48,36,.035)}
+.tabs button{border:0;border-radius:8px;padding:10px 15px;margin:0;transition:background .18s ease,color .18s ease,transform .18s ease}
+.tabs button:hover{background:var(--soft)}
+.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink);border:0;box-shadow:0 3px 8px rgba(8,127,104,.17)}
+.panel,details,.strip{border-radius:14px;box-shadow:0 4px 18px rgba(23,51,38,.035)}
+.panel{padding:clamp(16px,2vw,22px);transition:border-color .18s ease,box-shadow .18s ease}
+.panel h2{font-size:12px;letter-spacing:.095em;margin-bottom:16px}
+.panel h2 .hint{font-size:12px}
+.strip{overflow:hidden}
+.strip>div{padding:18px 20px;transition:background .18s ease}
+.strip>div:hover{background:var(--soft)}
+.k{font-size:10.5px;font-weight:700;letter-spacing:.095em}
+.v{font-size:clamp(21px,2vw,25px);letter-spacing:-.035em;line-height:1.35}
+.v.big{font-size:clamp(27px,2.6vw,34px)}
+.s{font-size:12px;color:var(--muted)}
+.banner{border-radius:12px;padding:12px 16px;box-shadow:0 2px 8px rgba(22,48,36,.025)}
+.btn{border-radius:8px;box-shadow:0 2px 4px rgba(8,127,104,.08);transition:transform .16s ease,box-shadow .16s ease,filter .16s ease}
+.btn:hover{filter:brightness(1.035);box-shadow:0 4px 10px rgba(8,127,104,.14);transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn.ghost{box-shadow:none}
+.chip{padding:6px 12px;transition:background .15s ease,border-color .15s ease}
+input,select,textarea{border-radius:8px;transition:border-color .15s ease,box-shadow .15s ease}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 13%,transparent);outline:none}
+table{border-spacing:0;font-size:13px}
+th{padding-top:11px;padding-bottom:11px;font-size:10.5px;letter-spacing:.075em}
+td{padding-top:10px;padding-bottom:10px}
+tbody tr:not(.grp):hover td{background:color-mix(in srgb,var(--accent) 4%,var(--surface))}
+tr.grp td{padding-top:11px;padding-bottom:11px}
+.tw{border-radius:9px}
+.chart{border-radius:10px}
+.chart .tip{box-shadow:0 12px 32px rgba(0,0,0,.14);border-radius:9px}
+.alloc{height:10px;border-radius:999px}
+.row{padding:9px 0}
+details{overflow:hidden}
+details>summary{padding:14px 17px}
+details>.in{padding:0 17px 17px}
+.account-card{border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.28);padding:26px}
+.account-card h2{letter-spacing:-.03em}
+.account-card input{border-radius:9px}
+.note{line-height:1.65}
+.empty{padding:36px 14px}
+@media(max-width:640px){body{padding-inline:12px;padding-top:16px}.app{gap:14px}.top{align-items:flex-start}.tabs{border-radius:10px;padding:4px;gap:2px}.tabs button{padding:9px 12px}.strip>div{padding:13px 14px}.panel{padding:15px}.v{font-size:21px}.account-card{padding:19px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{transition:none!important;animation:none!important}}
+
 </style>
 
 <div class="app">
