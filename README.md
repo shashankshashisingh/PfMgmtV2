@@ -20,29 +20,34 @@ Open `index.html` in a browser. No build step. Holdings are stored in the browse
 ## Data
 - The first load shows a simulated example portfolio.
 - Import transactions (`date,symbol,type,qty,price,class,name,fund`; the fund column is optional and creates the fund if it is new) or price history (`date,symbol,close`) from the Data tab.
-- Live prices: a GitHub Action (`.github/workflows/update-prices.yml`) runs every 10 minutes during NSE hours, fetches quotes with [stock-nse-india](https://github.com/hi-imcodeman/stock-nse-india) for every symbol in `symbols.json`, and commits `data/prices.json`. The dashboard reads that file when it is served over HTTP (for example GitHub Pages) and polls it every 30 seconds.
+- Live prices: a GitHub Action (`.github/workflows/update-prices.yml`) runs during NSE hours, fetches quotes with [stock-nse-india](https://github.com/hi-imcodeman/stock-nse-india) for symbols in `symbols.json`, and commits `data/prices.json`. The dashboard reads that file when served over HTTP (for example GitHub Pages) and polls it periodically.
 - Optional custom feed: any JSON endpoint returning `{"RELIANCE": 1432.5}`.
 - The symbol auto-fill (name, class, sector) only works inside Claude's artifact viewer.
 
 ## Live data (GitHub Actions)
-Two jobs keep the `data/` folder fresh. The dashboard reads it when served from GitHub Pages.
+The existing live quote and price-history workflows remain in place. This feature adds a third workflow for official NSE end-of-day cash-market data.
 
 | Job | When | Writes | Source |
 |---|---|---|---|
-| Update prices | every 15 minutes during NSE hours, and when `symbols.json` changes | `data/prices.json` (all NIFTY 500 stocks plus your symbols and benchmark indices), `data/directory.json` (symbol names for lookup, daily) | [stock-nse-india](https://github.com/hi-imcodeman/stock-nse-india) and NSE listing files |
-| Update price history | daily at 17:00 IST, and when `symbols.json` changes | `data/history.json` (daily closes for your symbols and indices) | [jugaad-data](https://github.com/jugaad-py/jugaad-data) |
+| Update prices | Scheduled during NSE hours | `data/prices.json`, `data/directory.json` | Existing quote adapter and NSE listing files |
+| Update price history | Daily and when symbols change | `data/history.json` | Existing `jugaad-data` workflow |
+| Update NSE Bhavcopy | Weekdays at 18:00 IST (12:30 UTC), manually, or when its scripts/config change | `data/bhavcopy.json` and merged configured-symbol closes in `data/history.json` | NSE CM Bhavcopy archives |
 
-Setup:
-1. Settings, then Pages: publish the `main` branch (root).
-2. Put your symbols in `symbols.json`. The Data tab has a "Copy symbols.json" button. Committing the file runs both jobs.
-3. Open the Data tab: "Live data status" shows what loaded and what did not.
+The Bhavcopy workflow tries the current NSE CM archive name and the legacy ZIP format, and walks back across recent calendar days for weekends and holidays. It retains up to 30 cached daily Bhavcopies and merges the configured symbols' daily closing prices into the existing history series (up to 800 observations per symbol). It does not overwrite `data/prices.json`: Bhavcopy is end-of-day data and is not a live quote feed. NSE can block cloud requests, and GitHub scheduled runs can be delayed.
 
-From GitHub's servers NSE currently refuses the bulk NIFTY 500 quote call and the live index levels (HTTP 403), but single-stock quotes, the symbol list and daily history work. So the job asks for one stock at a time: first the symbols in `symbols.json`, then every stock in the lists named under `universe` (NIFTY 500 by default), so most holdings get a price without being listed. Anything outside those lists needs adding to `symbols.json`, and benchmark statistics run up to the last close. Scheduled runs can be delayed by several minutes, so prices are near-live. NSE sometimes blocks cloud servers. If a job fails, the log in the Actions tab has the reason, and the dashboard keeps the last good data.
+Setup for GitHub Pages:
+1. In repository Settings → Pages, publish the `main` branch (root).
+2. Put your tracked symbols in `symbols.json`; commits trigger the existing data jobs.
+3. Inspect the Actions tab for workflow results and the Data tab for dashboard data status.
 
-The Claude preview cannot reach NSE or this repository, so symbol lookup there uses Claude and prices are not live.
+## NSE Bhavcopy MCP
+A standalone local stdio MCP server is available in `mcp/server.js`. Install dependencies with `npm install`, then run `npm run bhavcopy`. MCP tools expose the latest cached Bhavcopy, date/symbol-filtered rows, symbol history and symbol search. See [mcp/README.md](mcp/README.md) for client configuration.
+
+GitHub Actions refreshes the cache; it does not host a persistent MCP endpoint. To query through MCP, run the server locally against a checkout containing `data/bhavcopy.json` and `data/history.json`.
 
 ## Tests
-`node tests/core.test.js`
+- `npm test`
+- `npm run test:bhavcopy`
 
 ## Roadmap
 - Real quote backend (NSE/BSE data source) with a `/api/quote` endpoint

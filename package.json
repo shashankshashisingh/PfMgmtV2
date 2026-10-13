@@ -4,9 +4,15 @@
   "type": "module",
   "scripts": {
     "prices": "node scripts/fetch-prices.mjs",
-    "test": "node tests/core.test.js"
+    "fetch:bhavcopy": "node scripts/fetch-bhavcopy.mjs",
+    "bhavcopy": "node mcp/server.js",
+    "test": "node tests/core.test.js",
+    "test:bhavcopy": "node tests/bhavcopy.test.js"
   },
   "dependencies": {
-    "stock-nse-india": "^1.3.0"
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "adm-zip": "^0.5.16",
+    "stock-nse-india": "^1.3.0",
+    "zod": "^3.25.0"
   }
 }
