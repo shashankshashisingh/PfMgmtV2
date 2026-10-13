@@ -7,7 +7,7 @@
 :root{
   --bg:#F3F6F3; --surface:#FFFFFF; --ink:#14201C; --muted:#5B6862; --line:#DCE3DE; --soft:#EBF0EC;
   --accent:#0B6B5D; --accent-ink:#FFFFFF; --gain:#17803F; --loss:#B93A2E; --warn:#9A6200;
-  --c1:#0B6B5D; --c2:#3B6FB6; --c3:#7A5AA6; --c4:#C48A12; --c5:#8C6E4A; --c6:#5F7384; --c7:#B5527A; --c8:#2E8FA3; --c9:#98A39D;
+  --c1:#0B6B5D; --c2:#3B6FB6; --c3:#7A5AA6; --c4:#D0662E; --c5:#B5527A; --c6:#C48A12; --c7:#8C6E4A; --c8:#2E8FA3; --c9:#5F7384; --c10:#7C8A2E; --c11:#98A39D;
   --bench:#6B7A74;
   --font:'Instrument Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
   --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
@@ -15,12 +15,12 @@
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#0D1311; --surface:#151D1A; --ink:#E5ECE8; --muted:#92A09A; --line:#25302C; --soft:#1B2521;
   --accent:#3FC3AA; --accent-ink:#06201B; --gain:#4CC27F; --loss:#F0786B; --warn:#E0A64A;
-  --c1:#3FC3AA; --c2:#6B9BE0; --c3:#A98BD6; --c4:#E0AC3A; --c5:#C19C6C; --c6:#8EA4B6; --c7:#E087A8; --c8:#5CC0D4; --c9:#6E7B75;
+  --c1:#3FC3AA; --c2:#6B9BE0; --c3:#A98BD6; --c4:#F08F55; --c5:#E087A8; --c6:#E0AC3A; --c7:#C19C6C; --c8:#5CC0D4; --c9:#8EA4B6; --c10:#B2C259; --c11:#6E7B75;
   --bench:#9AA9A3; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0D1311; --surface:#151D1A; --ink:#E5ECE8; --muted:#92A09A; --line:#25302C; --soft:#1B2521;
   --accent:#3FC3AA; --accent-ink:#06201B; --gain:#4CC27F; --loss:#F0786B; --warn:#E0A64A;
-  --c1:#3FC3AA; --c2:#6B9BE0; --c3:#A98BD6; --c4:#E0AC3A; --c5:#C19C6C; --c6:#8EA4B6; --c7:#E087A8; --c8:#5CC0D4; --c9:#6E7B75;
+  --c1:#3FC3AA; --c2:#6B9BE0; --c3:#A98BD6; --c4:#F08F55; --c5:#E087A8; --c6:#E0AC3A; --c7:#C19C6C; --c8:#5CC0D4; --c9:#8EA4B6; --c10:#B2C259; --c11:#6E7B75;
   --bench:#9AA9A3; color-scheme:dark}
 body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.5;padding-inline:clamp(16px,3vw,32px);padding-block:20px 56px}
 *{box-sizing:border-box}
@@ -75,7 +75,11 @@ tr:last-child td{border-bottom:0}
 .ins{display:flex;flex-direction:column;line-height:1.3}
 .ins b{font-weight:600}
 .ins small{color:var(--muted);font-size:11.5px}
-.tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-left:6px;vertical-align:1px}
+tr.grp td{background:var(--soft);font-weight:600;border-bottom:1px solid var(--line)}
+tr.grp .n{font-weight:500}
+.grpbtn{appearance:none;background:none;border:0;padding:0;font:inherit;font-weight:600;color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+.grpbtn .cnt{font-weight:400;color:var(--muted);font-size:12px}
+tr.sec td:first-child{padding-left:28px}
 .swatch{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:8px}
 .dl{display:grid;grid-template-columns:1fr auto;gap:0;margin:0}
 .dl dt,.dl dd{margin:0;padding:7px 0;border-bottom:1px solid var(--line)}
@@ -183,7 +187,7 @@ section[hidden]{display:none!important}
     <div class="panel">
       <h2>Holdings</h2>
       <div class="tw" id="holdTable"></div>
-      <p class="note">Average cost uses first-in, first-out lots. Day change compares the last price with the previous close.</p>
+      <p class="note">Holdings are bundled under their asset class, and the class row adds them up. Click a class to fold it. Average cost uses first-in, first-out lots, and day change compares the last price with the previous close. Sorting applies inside each class.</p>
     </div>
     <details id="addBox">
       <summary>Add a transaction</summary>
@@ -425,8 +429,8 @@ const fmtD=s=>{const p=s.split('-');return +p[2]+' '+MON[+p[1]-1]+' '+p[0]};
 const fmtM=s=>MON[+s.slice(5,7)-1]+' '+s.slice(2,4);
 
 /* ---------- constants ---------- */
-const CLASSES=['Equities','Futures','Options','Commodities','REIT','InvIT','Money Market Funds','Long Term Fixed Income','Other'];
-const CLASS_ALIASES={equity:'Equities',equities:'Equities',stock:'Equities',stocks:'Equities',share:'Equities',shares:'Equities',etf:'Equities','mutual fund':'Equities',mf:'Equities',
+const CLASSES=['Equities','ETFs','Mutual Funds','Futures','Options','Commodities','REIT','InvIT','Money Market Funds','Long Term Fixed Income','Other'];
+const CLASS_ALIASES={equity:'Equities',equities:'Equities',stock:'Equities',stocks:'Equities',share:'Equities',shares:'Equities',etf:'ETFs',etfs:'ETFs','exchange traded fund':'ETFs','mutual fund':'Mutual Funds','mutual funds':'Mutual Funds',mf:'Mutual Funds',mfs:'Mutual Funds',
   future:'Futures',futures:'Futures',fut:'Futures',option:'Options',options:'Options',opt:'Options',
   commodity:'Commodities',commodities:'Commodities',gold:'Commodities',silver:'Commodities',reit:'REIT',reits:'REIT',invit:'InvIT',invits:'InvIT',
   'money market':'Money Market Funds','money market fund':'Money Market Funds','money market funds':'Money Market Funds',mmf:'Money Market Funds',liquid:'Money Market Funds','liquid fund':'Money Market Funds',
@@ -440,7 +444,7 @@ function normClass(c){
 const clsColor=c=>'var(--c'+(Math.max(0,CLASSES.indexOf(c))+1)+')';
 const PERIODS=['1M','3M','6M','YTD','1Y','All'];
 const LS='portfolio-desk.v1';
-const DEMO_TARGETS={'Equities':50,'Commodities':10,'REIT':5,'InvIT':5,'Money Market Funds':10,'Long Term Fixed Income':20};
+const DEMO_TARGETS={'Equities':35,'ETFs':15,'Mutual Funds':20,'Commodities':5,'REIT':5,'InvIT':5,'Money Market Funds':5,'Long Term Fixed Income':10};
 
 /* ---------- time in IST ---------- */
 function istNow(){
@@ -469,12 +473,13 @@ const DEMO_SYMS=[
   {s:'TCS',n:'Tata Consultancy Services',c:'Equities',p0:3900,b:.65,idio:.011,dr:.06},
   {s:'ICICIBANK',n:'ICICI Bank',c:'Equities',p0:1120,b:1.05,idio:.0105,dr:.13},
   {s:'ITC',n:'ITC',c:'Equities',p0:430,b:.6,idio:.0095,dr:.09},
-  {s:'NIFTYBEES',n:'Nifty 50 ETF',c:'Equities',p0:245,b:1,idio:.0006,dr:.12},
-  {s:'GOLDBEES',n:'Gold ETF',c:'Commodities',p0:62,b:.04,idio:.0075,dr:.14},
-  {s:'FLEXICAP',n:'Example Flexi Cap Fund',c:'Equities',p0:78,b:.85,idio:.0042,dr:.13},
-  {s:'MIDCAPFUND',n:'Example Midcap Fund',c:'Equities',p0:95,b:1.12,idio:.0045,dr:.16},
-  {s:'SMALLCAPFUND',n:'Example Smallcap Fund',c:'Equities',p0:140,b:1.25,idio:.006,dr:.17},
+  {s:'NIFTYBEES',n:'Nifty 50 ETF',c:'ETFs',p0:245,b:1,idio:.0006,dr:.12},
+  {s:'GOLDBEES',n:'Gold ETF',c:'ETFs',p0:62,b:.04,idio:.0075,dr:.14},
+  {s:'FLEXICAP',n:'Example Flexi Cap Fund',c:'Mutual Funds',p0:78,b:.85,idio:.0042,dr:.13},
+  {s:'MIDCAPFUND',n:'Example Midcap Fund',c:'Mutual Funds',p0:95,b:1.12,idio:.0045,dr:.16},
+  {s:'SMALLCAPFUND',n:'Example Smallcap Fund',c:'Mutual Funds',p0:140,b:1.25,idio:.006,dr:.17},
   {s:'DEBTFUND',n:'Example Liquid Fund',c:'Money Market Funds',p0:1050,b:0,idio:.0004,dr:.068},
+  {s:'SGBEX',n:'Example Sovereign Gold Bond',c:'Commodities',p0:6200,b:.04,idio:.006,dr:.12},
   {s:'REITEX',n:'Example REIT',c:'REIT',p0:380,b:.35,idio:.006,dr:.09},
   {s:'INVITEX',n:'Example InvIT',c:'InvIT',p0:110,b:.15,idio:.004,dr:.1},
   {s:'BANKFD',n:'Bank fixed deposit',c:'Long Term Fixed Income',p0:1000,b:0,idio:0,dr:.071,fixed:true}
@@ -505,7 +510,7 @@ function buildDemo(){
   const L='f1',M='f2',Sm='f3',D='f4';
   add('RELIANCE',22,40,'BUY',L);add('HDFCBANK',22,30,'BUY',L);add('TCS',24,12,'BUY',L);add('ICICIBANK',30,45,'BUY',L);
   add('ITC',30,120,'BUY',L);add('NIFTYBEES',34,300,'BUY',L);add('GOLDBEES',36,900,'BUY',D);add('DEBTFUND',40,35,'BUY',D);
-  add('BANKFD',40,150,'BUY',D);add('REITEX',70,400,'BUY',D);add('INVITEX',90,1000,'BUY',D);add('REITEX',280,200,'BUY',D);add('TCS',140,8,'BUY',L);add('RELIANCE',210,25,'BUY',L);add('ICICIBANK',250,30,'BUY',L);
+  add('BANKFD',40,150,'BUY',D);add('SGBEX',100,25,'BUY',D);add('REITEX',70,400,'BUY',D);add('INVITEX',90,1000,'BUY',D);add('REITEX',280,200,'BUY',D);add('TCS',140,8,'BUY',L);add('RELIANCE',210,25,'BUY',L);add('ICICIBANK',250,30,'BUY',L);
   add('ITC',300,50,'SELL',L);add('NIFTYBEES',330,200,'BUY',L);add('GOLDBEES',360,400,'BUY',D);add('HDFCBANK',372,20,'BUY',L);
   for(let k=0;k<11;k++)add('FLEXICAP',44+k*32,260,'BUY',M);
   add('MIDCAPFUND',50,1500,'BUY',M);add('MIDCAPFUND',200,1200,'BUY',M);
@@ -766,19 +771,29 @@ function spark(vals){
   const up=v[v.length-1]>=v[0];
   return '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" aria-hidden="true"><polyline points="'+pts+'" fill="none" stroke="var(--'+(up?'gain':'loss')+')" stroke-width="1.5"/></svg>';
 }
+const COLLAPSED={};
 function renderHoldings(){
   const h=C.held||[];
-  if(!h.length){$('#holdTable').innerHTML=emptyMsg()}
-  else{
-    const k=S.sort.k,dir=S.sort.dir;
-    const sorted=h.slice().sort((a,b)=>{const x=a[k],y=b[k];return (typeof x==='string'?x.localeCompare(y):(x-y))*dir});
-    const cols=[['name','Instrument',0],['qty','Qty',1],['avg','Avg cost',1],['ltp','Last price',1],['dayPct','Day',1],['dayPnl','Day P&L',1],['value','Value',1],['unreal','Profit',1],['unrealPct','Return',1],['w','Weight',1]];
-    $('#holdTable').innerHTML='<table><thead><tr>'+cols.map(c=>'<th class="sortable '+(c[2]?'n':'')+'" data-sort="'+c[0]+'">'+c[1]+(k===c[0]?(dir<0?' ↓':' ↑'):'')+'</th>').join('')+'<th>30 days</th></tr></thead><tbody>'+
-      sorted.map(p=>{const sp=spark((C.px[p.s]||[]).slice(-30));return '<tr><td><div class="ins"><b>'+esc(p.name)+'<span class="tag">'+esc(p.cls)+'</span></b><small>'+esc(p.s)+(p.sector?' · '+esc(p.sector):'')+'</small></div></td>'+
+  if(!h.length){$('#holdTable').innerHTML=emptyMsg();return}
+  const k=S.sort.k,dir=S.sort.dir;
+  const cmp=(a,b)=>{const x=a[k],y=b[k];return (typeof x==='string'?x.localeCompare(y):(x-y))*dir};
+  const cols=[['name','Instrument',0],['qty','Qty',1],['avg','Avg cost',1],['ltp','Last price',1],['dayPct','Day',1],['dayPnl','Day P&L',1],['value','Value',1],['unreal','Profit',1],['unrealPct','Return',1],['w','Weight',1]];
+  const groups={};for(const p of h)(groups[p.cls]||(groups[p.cls]=[])).push(p);
+  const order=CLASSES.filter(c=>groups[c]).concat(Object.keys(groups).filter(c=>!CLASSES.includes(c)));
+  let body='';
+  for(const c of order){
+    const g=groups[c].slice().sort(cmp);
+    const val=sum(g.map(p=>p.value)),cost=sum(g.map(p=>p.cost)),day=sum(g.map(p=>p.dayPnl)),un=val-cost,w=sum(g.map(p=>p.w));
+    const dayPct=val-day>0?day/(val-day):0,open=!COLLAPSED[c];
+    body+='<tr class="grp"><td><button class="grpbtn" data-grp="'+esc(c)+'" aria-expanded="'+open+'"><span aria-hidden="true">'+(open?'▾':'▸')+'</span><span class="swatch" style="background:'+clsColor(c)+';margin:0"></span>'+esc(c)+' <span class="cnt">'+g.length+(g.length===1?' holding':' holdings')+'</span></button></td>'+
+      '<td></td><td></td><td></td><td class="n '+sg(day)+'">'+pcS(dayPct)+'</td><td class="n '+sg(day)+'">'+inrS(day)+'</td><td class="n">'+inr(val)+'</td><td class="n '+sg(un)+'">'+inrS(un)+'</td><td class="n '+sg(un)+'">'+pcS(cost?val/cost-1:NaN)+'</td><td class="n">'+pc(w,1)+'</td><td></td></tr>';
+    if(open)for(const p of g){const sp=spark((C.px[p.s]||[]).slice(-30));
+      body+='<tr class="sec"><td><div class="ins"><b>'+esc(p.name)+'</b><small>'+esc(p.s)+(p.sector?' · '+esc(p.sector):'')+'</small></div></td>'+
       '<td class="n">'+nm(p.qty,p.qty%1?3:0)+'</td><td class="n">'+inr(p.avg,1)+'</td><td class="n">'+inr(p.ltp,1)+'</td>'+
       '<td class="n '+sg(p.dayPct)+'">'+pcS(p.dayPct)+'</td><td class="n '+sg(p.dayPnl)+'">'+inrS(p.dayPnl)+'</td><td class="n">'+inr(p.value)+'</td>'+
-      '<td class="n '+sg(p.unreal)+'">'+inrS(p.unreal)+'</td><td class="n '+sg(p.unreal)+'">'+pcS(p.unrealPct)+'</td><td class="n">'+pc(p.w,1)+'</td><td>'+sp+'</td></tr>'}).join('')+'</tbody></table>';
+      '<td class="n '+sg(p.unreal)+'">'+inrS(p.unreal)+'</td><td class="n '+sg(p.unreal)+'">'+pcS(p.unrealPct)+'</td><td class="n">'+pc(p.w,1)+'</td><td>'+sp+'</td></tr>';}
   }
+  $('#holdTable').innerHTML='<table><thead><tr>'+cols.map(c=>'<th class="sortable '+(c[2]?'n':'')+'" data-sort="'+c[0]+'">'+c[1]+(k===c[0]?(dir<0?' ↓':' ↑'):'')+'</th>').join('')+'<th>30 days</th></tr></thead><tbody>'+body+'</tbody></table>';
 }
 function renderTxns(){
   const t=sortTxns(S.txns).reverse();
@@ -1097,6 +1112,7 @@ document.addEventListener('click',e=>{
   if(t.dataset.tab){setTab(t.dataset.tab);return}
   if(t.dataset.per){S.period=t.dataset.per;save();renderAll();return}
   if(t.dataset.sort){const k=t.dataset.sort;S.sort=S.sort.k===k?{k,dir:-S.sort.dir}:{k,dir:k==='name'?1:-1};save();renderHoldings();return}
+  if(t.dataset.grp){COLLAPSED[t.dataset.grp]=!COLLAPSED[t.dataset.grp];renderHoldings();return}
   if(t.dataset.view){S.view=t.dataset.view;save();renderAll();if(S.view!=='ALL')$('#fFund').value=S.view;return}
   if(t.dataset.fundsel){S.view=t.dataset.fundsel;save();compute();setTab('today');return}
   if(t.dataset.fdel){
@@ -1132,7 +1148,7 @@ async function lookupSymbol(){
   if(!sample){msg(M,'Symbol lookup is not available in this view. Enter the name and class by hand.','');return}
   msg(M,'Looking up '+sym+'…','');
   try{
-    const r=await sample.json('Identify the Indian listed security or fund with the NSE or BSE symbol "'+sym+'". Reply with JSON only, in this shape: {"name": string or null, "assetClass": one of ["Equities","Futures","Options","Commodities","REIT","InvIT","Money Market Funds","Long Term Fixed Income","Other"], "sector": string or null}. Use null for name if you are not confident the symbol exists. Shares, equity ETFs and equity mutual funds are "Equities". Gold and silver ETFs are "Commodities". Liquid and overnight funds are "Money Market Funds". Bond funds, G-secs and fixed deposits are "Long Term Fixed Income". Do not include prices.',{modelTier:'quick'});
+    const r=await sample.json('Identify the Indian listed security or fund with the NSE or BSE symbol "'+sym+'". Reply with JSON only, in this shape: {"name": string or null, "assetClass": one of ["Equities","ETFs","Mutual Funds","Futures","Options","Commodities","REIT","InvIT","Money Market Funds","Long Term Fixed Income","Other"], "sector": string or null}. Use null for name if you are not confident the symbol exists. Listed company shares are "Equities". Exchange traded funds, including gold and index ETFs, are "ETFs". Mutual fund schemes are "Mutual Funds", except liquid and overnight funds, which are "Money Market Funds". Sovereign gold bonds are "Commodities". Bond funds, G-secs and fixed deposits are "Long Term Fixed Income". Do not include prices.',{modelTier:'quick'});
     if(!r||!r.name){msg(M,'Could not identify '+sym+'. Enter the name and class by hand.','err');return}
     $('#fName').value=String(r.name);
     {const ac=normClass(r.assetClass);if(ac)$('#fCls').value=ac}
