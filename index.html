@@ -102,7 +102,9 @@ tr.sec td:first-child{padding-left:28px}
 .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .bar{height:6px;border-radius:3px;background:var(--soft);position:relative;grid-column:1/-1}
 .bar>i{position:absolute;top:0;height:100%;border-radius:3px;display:block}
-form.f{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;align-items:start}\n@media(max-width:900px){form.f{grid-template-columns:repeat(3,minmax(0,1fr))}}\n@media(max-width:560px){form.f{grid-template-columns:repeat(2,minmax(0,1fr))}}
+form.f{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;align-items:start}
+@media(max-width:900px){form.f{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:560px){form.f{grid-template-columns:repeat(2,minmax(0,1fr))}}
 label.fl{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
 input,select,textarea{font:inherit;font-size:13px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px;min-width:0;width:100%}
 input[type=number]{font-family:var(--mono)}
@@ -1494,7 +1496,8 @@ document.addEventListener('change',e=>{
   const t=e.target;
   if(t.id==='benchSel'){const f=S.funds.find(x=>x.id===S.view);if(f)f.bench=t.value;else S.bench=t.value;save();renderBench()}
   if(t.dataset&&t.dataset.fname!==undefined){const f=S.funds.find(x=>x.id===t.dataset.fname),v=t.value.trim();if(f&&v&&S.mode==='user'){f.name=v;save();renderAll()}else if(S.mode==='demo'){msg($('#fundMsg'),'This is the example portfolio. Import your holdings or start empty before changing funds.','err');renderFunds()}}
-  if(t.dataset&&t.dataset.fbench!==undefined){const f=S.funds.find(x=>x.id===t.dataset.fbench);if(f&&S.mode==='user'){f.bench=t.value;save();renderAll()}else if(S.mode==='demo'){msg($('#fundMsg'),'This is the example portfolio. Import your holdings or start empty before changing funds.','err');renderFunds()}}\n  if(t.dataset&&t.dataset.ftotal!==undefined){const f=S.funds.find(x=>x.id===t.dataset.ftotal),v=t.value.trim()===''?0:Number(t.value);if(f&&S.mode==='user'&&Number.isFinite(v)&&v>=0){f.totalAssets=v;save();msg($('#fundMsg'),'Total asset amount saved for '+f.name+'.','ok')}else if(S.mode==='demo'){msg($('#fundMsg'),'This is the example portfolio. Import your holdings or start empty before changing fund settings.','err');renderFunds()}else if(!Number.isFinite(v)||v<0){msg($('#fundMsg'),'Enter a valid amount of zero or more.','err')}}
+  if(t.dataset&&t.dataset.fbench!==undefined){const f=S.funds.find(x=>x.id===t.dataset.fbench);if(f&&S.mode==='user'){f.bench=t.value;save();renderAll()}else if(S.mode==='demo'){msg($('#fundMsg'),'This is the example portfolio. Import your holdings or start empty before changing funds.','err');renderFunds()}}
+  if(t.dataset&&t.dataset.ftotal!==undefined){const f=S.funds.find(x=>x.id===t.dataset.ftotal),v=t.value.trim()===''?0:Number(t.value);if(f&&S.mode==='user'&&Number.isFinite(v)&&v>=0){f.totalAssets=v;save();msg($('#fundMsg'),'Total asset amount saved for '+f.name+'.','ok')}else if(S.mode==='demo'){msg($('#fundMsg'),'This is the example portfolio. Import your holdings or start empty before changing fund settings.','err');renderFunds()}else if(!Number.isFinite(v)||v<0){msg($('#fundMsg'),'Enter a valid amount of zero or more.','err')}}
   if(t.id==='rfIn'){const v=parseFloat(t.value);if(isFinite(v)&&v>=0){S.rf=v;save();renderBench()}}
   if(t.dataset&&t.dataset.target!==undefined){const v=parseFloat(t.value);const TG=S.targets[S.view]||(S.targets[S.view]={});if(isFinite(v))TG[t.dataset.target]=v;else delete TG[t.dataset.target];save();renderRebalance()}
 });
