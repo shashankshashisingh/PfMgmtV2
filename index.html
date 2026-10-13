@@ -304,13 +304,9 @@ section[hidden]{display:none!important}
     </div>
     <div class="grid2">
       <div class="panel">
-        <h2>Live price feed</h2>
-        <p class="note" style="margin:0 0 10px">Optional. Point this at a JSON endpoint that returns <span class="mono">{"RELIANCE": 1432.5, "TCS": {"ltp": 3921}}</span>. It is polled every 30 seconds. This published page cannot reach outside hosts, so the feed works when the file is opened from your own computer or server.</p>
-        <form class="f" id="feedForm" onsubmit="return false">
-          <label class="fl" style="grid-column:1/-1">Endpoint URL<input id="feedUrl" type="url" placeholder="https://your-server.example/prices.json"></label>
-          <button class="btn" type="button" id="feedSave">Save and poll</button>
-        </form>
-        <div class="msg" id="feedMsg"></div>
+        <h2>Market data source</h2>
+        <p class="note" style="margin:0 0 10px">NSE CM Bhavcopy is the primary source for equity closing prices and symbol names. Prices refresh when the scheduled GitHub Action publishes a new Bhavcopy; they are end-of-day closes, not intraday live quotes.</p>
+        <div class="msg" id="feedMsg">Prices are loaded from data/prices.json.</div>
       </div>
       <div class="panel">
         <h2>Your data</h2>
@@ -556,7 +552,7 @@ function save(){
 function load(){
   try{
     const raw=localStorage.getItem(LS);
-    if(raw){const o=JSON.parse(raw);if(o&&o.mode==='user'&&Array.isArray(o.txns)){S=Object.assign(blank(),o);S.live={};normalize();return}}
+    if(raw){const o=JSON.parse(raw);if(o&&o.mode==='user'&&Array.isArray(o.txns)){S=Object.assign(blank(),o);S.live={};S.feedUrl='';normalize();return}}
   }catch(e){}
   S=demoState();
 }
@@ -1254,13 +1250,11 @@ async function loadRepoData(){
   try{const j=await getJSON('data/history.json');FEED.hist=j;REPO.histCount=Object.keys(j.series||{}).length;REPO.histUpdated=j.updated||'';REPO.histErr=''}catch(e){REPO.histErr=e.message}
   try{const j=await getJSON('data/prices.json');FEED.raw=j;REPO.priceCount=Object.keys(j.prices||{}).length;REPO.priceUpdated=j.updated||'';REPO.priceErrors=j.errors||{};REPO.priceErr=''}catch(e){REPO.priceErr=e.message}
   fillSymbolLists();
-  if(S.mode==='user'){
-    applyHistory();
-    if(!S.feedUrl&&REPO.priceCount>0){S.feedUrl='data/prices.json';save();startFeed()}
-  }else if(S.mode==='demo'&&!S.feedUrl&&REPO.priceCount>0){
-    // Load repository quotes automatically even before the user imports a portfolio.
-    S.feedUrl='data/prices.json';startFeed();
-  }
+  // Always use the repository's Bhavcopy-generated prices as the sole primary quote file.
+  S.feedUrl='data/prices.json';
+  if(S.mode==='user')applyHistory();
+  save();
+  startFeed();
   renderRepoStatus();
 }
 function ago(iso){
@@ -1345,13 +1339,6 @@ $('#csvGo').addEventListener('click',()=>{
   msg(M,'Imported '+r.ok+' '+r.kind+(r.bad?' and skipped '+r.bad+' rows with a bad date, symbol or number':'')+'. '+(r.warns||[]).join(' '),r.ok?'ok':'err');
   $('#csvIn').value='';
   renderAll();
-});
-$('#feedSave').addEventListener('click',()=>{
-  const u=$('#feedUrl').value.trim();
-  if(S.mode==='demo'){msg($('#feedMsg'),'Import your own holdings first. The example portfolio uses simulated prices.','err');return}
-  S.feedUrl=u;save();
-  if(!u){clearInterval(feedTimer);msg($('#feedMsg'),'Feed removed.','ok');return}
-  msg($('#feedMsg'),'Polling…','');startFeed();pollFeed(true);
 });
 $('#copyTx').addEventListener('click',async()=>{
   const lines=['date,symbol,type,qty,price,class,name,fund'].concat(sortTxns(S.txns).map(t=>[t.date,t.symbol,t.type,t.qty,t.price,(S.meta[t.symbol]||{}).cls||'',JSON.stringify((S.meta[t.symbol]||{}).name||''),JSON.stringify(fundName(t.fund))].join(',')));
