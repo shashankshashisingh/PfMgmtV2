@@ -2,6 +2,7 @@ name: Update NSE Bhavcopy
 
 on:
   schedule:
+    # NSE cash-market Bhavcopy is end-of-day; run after the close, 18:00 IST (12:30 UTC).
     - cron: "30 12 * * 1-5"
   workflow_dispatch:
   push:
@@ -9,6 +10,7 @@ on:
       - "symbols.json"
       - "scripts/fetch-bhavcopy.mjs"
       - "scripts/bhavcopy.js"
+      - "package.json"
       - ".github/workflows/update-bhavcopy.yml"
 
 permissions:
@@ -27,18 +29,22 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install
+      - run: npm install --no-audit --no-fund
       - run: npm test
       - run: npm run test:bhavcopy
       - run: npm run fetch:bhavcopy
-      - name: Commit updated market data
+      - name: Commit Bhavcopy prices, symbol directory, and history
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/bhavcopy.json data/history.json
+          git add data/bhavcopy.json data/prices.json data/directory.json data/history.json
           if ! git diff --cached --quiet; then
-            git commit -m "Update NSE Bhavcopy market data"
-            git push
+            git commit -m "Update NSE Bhavcopy prices and symbols"
+            for i in 1 2 3; do
+              git pull --rebase origin main && git push && exit 0
+              sleep 5
+            done
+            exit 1
           else
             echo "No data changes to commit."
           fi
