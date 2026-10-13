@@ -207,8 +207,9 @@ section[hidden]{display:none!important}
           <label class="fl">Name<input id="fName" placeholder="Reliance Industries"></label>
           <label class="fl">Asset class<select id="fCls"></select></label>
           <label class="fl">Quantity / units<input type="number" id="fQty" step="any" min="0" required></label>
-          <label class="fl">Price (₹)<input type="number" id="fPrice" step="any" min="0" required></label>
+          <label class="fl">Trade price (₹)<input type="number" id="fPrice" step="any" min="0" placeholder="Blank = market price"></label>
           <label class="fl">Current price (₹)<input type="number" id="fCur" step="any" min="0" placeholder="optional"></label>
+          <div class="fl" style="grid-column:1/-1;border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:12px"><span><b>Notional trade value</b><span class="note" id="tradeValueHint" style="display:block;margin:2px 0 0">Quantity × trade price</span></span><b class="mono" id="tradeNotional">—</b></div>
           <button class="btn ghost" type="button" id="fLookup">Look up symbol</button>
           <button class="btn" type="submit">Add</button>
         </form>
@@ -1335,12 +1336,35 @@ function renderRepoStatus(){
     (errs?'<p class="note">Last job reported: '+errs+'</p>':'')+
     ((!pOk||!REPO.dirCount)?'<p class="note">If a job shows a red cross in Actions, NSE is probably blocking GitHub\'s servers. The job log has the reason.</p>':'');
 }
+function marketPriceFor(sym){
+  const feed=FEED.raw&&FEED.raw.prices&&FEED.raw.prices[sym];
+  if(feed&&Number.isFinite(Number(feed.ltp))&&Number(feed.ltp)>0)return {price:Number(feed.ltp),source:'NSE Bhavcopy close'};
+  if(Number.isFinite(Number(S.manual[sym]))&&Number(S.manual[sym])>0)return {price:Number(S.manual[sym]),source:'manual current price'};
+  if(Number.isFinite(Number(S.live[sym]))&&Number(S.live[sym])>0)return {price:Number(S.live[sym]),source:'available live price'};
+  const series=S.series[sym];
+  if(series&&series.c&&series.c.length){
+    const p=Number(series.c[series.c.length-1]);
+    if(Number.isFinite(p)&&p>0)return {price:p,source:'last available close'};
+  }
+  return null;
+}
+function updateTradeNotional(){
+  const sym=$('#fSym').value.trim().toUpperCase(),qty=Number($('#fQty').value),typed=$('#fPrice').value.trim();
+  const resolved=typed!==''?Number(typed):(marketPriceFor(sym)?.price);
+  const valid=Number.isFinite(qty)&&qty>0&&Number.isFinite(resolved)&&resolved>0;
+  $('#tradeNotional').textContent=valid?inr(qty*resolved,2):'—';
+  $('#tradeValueHint').textContent=typed!==''?'Quantity × entered trade price':(valid?'Quantity × market price ('+(marketPriceFor(sym)?.source||'available price')+')':'Enter a symbol and quantity; market price is used if trade price is blank.');
+}
+['fSym','fQty','fPrice','fType'].forEach(id=>$('#'+id).addEventListener('input',updateTradeNotional));
+['fSym','fPrice'].forEach(id=>$('#'+id).addEventListener('change',updateTradeNotional));
 $('#txnForm').addEventListener('submit',e=>{
   e.preventDefault();
   let fund=$('#fFund').value;
-  const date=$('#fDate').value,type=$('#fType').value,sym=$('#fSym').value.trim().toUpperCase(),qty=parseFloat($('#fQty').value),price=parseFloat($('#fPrice').value),cur=parseFloat($('#fCur').value);
+  const date=$('#fDate').value,type=$('#fType').value,sym=$('#fSym').value.trim().toUpperCase(),qty=parseFloat($('#fQty').value),typedPrice=$('#fPrice').value.trim(),cur=parseFloat($('#fCur').value);
+  const market=typedPrice===''?marketPriceFor(sym):null;
+  const price=typedPrice===''?(market?market.price:NaN):Number(typedPrice);
   const M=$('#txnMsg');
-  if(!date||!sym||!(qty>0)||!(price>=0)){msg(M,'Enter a date, symbol, quantity and price.','err');return}
+  if(!date||!sym||!(qty>0)||!(price>0)||!Number.isFinite(price)){msg(M,typedPrice===''?'No market price is available for '+sym+'. Enter a trade price or load price data first.':'Enter a date, symbol, positive quantity and a valid positive price.','err');return}
   if(S.mode==='demo'){ensureUser()}
   if(!S.funds.some(f=>f.id===fund))fund=S.funds[0].id;
   if(type==='SELL'){
@@ -1356,7 +1380,9 @@ $('#txnForm').addEventListener('submit',e=>{
   save();
   afterDataChange();
   $('#fQty').value='';$('#fPrice').value='';$('#fCur').value='';
-  msg(M,(type==='BUY'?'Bought ':'Sold ')+qty+' '+sym+'.','ok');
+  const notional=qty*price;
+  msg(M,(type==='BUY'?'Bought ':'Sold ')+qty+' '+sym+' at '+inr(price,2)+' ('+inr(notional,2)+' notional)'+(typedPrice===''?' using '+market.source+'.':'.'),'ok');
+  updateTradeNotional();
   renderAll();
 });
 $('#fundForm').addEventListener('submit',e=>{
