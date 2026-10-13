@@ -1,5 +1,5 @@
--- Run in Supabase SQL Editor if setting up this feature in a new project.
--- The existing project already has this table and owner-based RLS policies.
+-- PortfolioMgmt account cloud storage.
+-- Run in Supabase SQL Editor if you need to recreate this schema.
 create table if not exists public.portfolios (
   user_id uuid not null references auth.users(id) on delete cascade,
   app text not null,
