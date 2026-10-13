@@ -141,6 +141,7 @@ section[hidden]{display:none!important}
     <button role="tab" data-tab="stats" aria-selected="false">Statistics</button>
     <button role="tab" data-tab="bench" aria-selected="false">vs Benchmark</button>
     <button role="tab" data-tab="rebalance" aria-selected="false">Rebalance</button>
+    <button role="tab" data-tab="charges" aria-selected="false">Charges</button>
     <button role="tab" data-tab="data" aria-selected="false">Data</button>
   </nav>
 
@@ -203,6 +204,7 @@ section[hidden]{display:none!important}
           <label class="fl">Fund<select id="fFund"></select></label>
           <label class="fl">Date<input type="date" id="fDate" required></label>
           <label class="fl">Side<select id="fType"><option value="BUY">Buy</option><option value="SELL">Sell</option><option value="SHORT">Short sell</option><option value="COVER">Cover short</option></select></label>
+          <label class="fl">Trade product<select id="fProduct"><option value="AUTO">Auto by asset class</option><option value="EQ_DELIVERY">Equity delivery</option><option value="EQ_INTRADAY">Equity intraday</option><option value="EQ_MTF">Equity MTF</option><option value="EQ_FUTURES">Equity futures</option><option value="EQ_OPTIONS">Equity options</option><option value="COM_FUTURES">Commodity futures</option><option value="COM_OPTIONS">Commodity options</option></select></label>
           <label class="fl">Symbol<input id="fSym" list="symList" placeholder="RELIANCE" required><datalist id="symList"></datalist></label>
           <label class="fl">Name<input id="fName" placeholder="Reliance Industries"></label>
           <label class="fl">Asset class<select id="fCls"></select></label>
@@ -275,6 +277,19 @@ section[hidden]{display:none!important}
       <div class="msg" id="rebMsg"></div>
     </div>
     <div class="panel"><h2>Concentration</h2><div id="concBox"></div></div>
+  </section>
+
+  <!-- CHARGES -->
+  <section id="tab-charges" class="stack" hidden>
+    <div class="strip" id="chargeKpis"></div>
+    <div class="panel"><h2>Fees by fund <span class="hint">Dhan tariff-based estimate</span></h2><div class="tw" id="chargeFundTable"></div>
+      <p class="note">Fees apply the current published Dhan tariff to transactions recorded in this browser. They are estimates, not broker contract-note values, and may differ from actual debits—especially for older trades, BSE trades, special scrip groups, options expiry/exercise, exchange-specific F&amp;O/commodity levies, and trades whose product type was not recorded. Equity defaults to NSE delivery unless a product is selected on the transaction form.</p>
+    </div>
+    <div class="panel"><h2>Charge composition</h2><div class="tw" id="chargeTypeTable"></div></div>
+    <div class="panel"><h2>Transaction-level breakdown <span class="hint">brokerage, taxes, DP charges and estimated MTF interest</span></h2><div class="tw" id="chargeTxnTable"></div></div>
+    <div class="panel"><h2>Rates and assumptions</h2><div class="tw" id="chargeRates"></div>
+      <p class="note">Official tariff: <a href="https://dhan.co/pricing/" target="_blank" rel="noopener">Dhan Pricing &amp; Brokerage Charges</a>. NSE rates are used for equity exchange charges because the ledger does not store execution exchange. MTF interest assumes 75% broker funding and applies the current interest tier to the estimated funded amount for the holding period; actual funding and slab may differ. Auto-square-off and call-and-trade fees are excluded because the ledger does not identify those services.</p>
+    </div>
   </section>
 
   <!-- DATA -->
@@ -854,8 +869,8 @@ function renderHoldings(){
 function renderTxns(){
   const t=sortTxns(S.txns).reverse();
   if(!t.length){$('#txnTable').innerHTML='<div class="empty">No transactions recorded.</div>';return}
-  $('#txnTable').innerHTML='<table><thead><tr><th>Date</th><th>Fund</th><th>Side</th><th>Symbol</th><th class="n">Qty</th><th class="n">Price</th><th class="n">Amount</th><th></th></tr></thead><tbody>'+
-    t.map(x=>'<tr><td>'+esc(fmtD(x.date))+'</td><td>'+esc(fundName(x.fund))+'</td><td class="'+(x.type==='BUY'?'':'loss')+'">'+({BUY:'Buy',SELL:'Sell',SHORT:'Short sell',COVER:'Cover short'}[x.type]||x.type)+'</td><td>'+esc(x.symbol)+'</td><td class="n">'+nm(x.qty,x.qty%1?3:0)+'</td><td class="n">'+inr(x.price,2)+'</td><td class="n">'+inr(x.qty*x.price)+'</td><td><button class="btn ghost sm" data-del="'+x.id+'" aria-label="Delete transaction">Delete</button></td></tr>').join('')+'</tbody></table>';
+  $('#txnTable').innerHTML='<table><thead><tr><th>Date</th><th>Fund</th><th>Side</th><th>Symbol</th><th>Product</th><th class="n">Qty</th><th class="n">Price</th><th class="n">Amount</th><th></th></tr></thead><tbody>'+
+    t.map(x=>'<tr><td>'+esc(fmtD(x.date))+'</td><td>'+esc(fundName(x.fund))+'</td><td class="'+(x.type==='BUY'?'':'loss')+'">'+({BUY:'Buy',SELL:'Sell',SHORT:'Short sell',COVER:'Cover short'}[x.type]||x.type)+'</td><td>'+esc(x.symbol)+'</td><td>'+esc(chargeProductLabel(x))+'</td><td class="n">'+nm(x.qty,x.qty%1?3:0)+'</td><td class="n">'+inr(x.price,2)+'</td><td class="n">'+inr(x.qty*x.price)+'</td><td><button class="btn ghost sm" data-del="'+x.id+'" aria-label="Delete transaction">Delete</button></td></tr>').join('')+'</tbody></table>'
 }
 function fillSymbolLists(){
   const symSet=new Set(Object.keys(S.series).filter(s=>(S.meta[s]||{}).cls!=='Index'));
@@ -1044,6 +1059,7 @@ function renderTabContent(){
   else if(activeTab==='stats')renderStats();
   else if(activeTab==='bench')renderBench();
   else if(activeTab==='rebalance')renderRebalance();
+  else if(activeTab==='charges')renderCharges();
   else if(activeTab==='data')renderData();
 }
 function setTab(t){
@@ -1083,7 +1099,7 @@ function importCSV(text){
   if(rows.length<2)return {err:'Nothing to import. Include a header row and at least one data row.'};
   const hdr=rows[0].map(x=>x.trim().toLowerCase());
   const ix=(...names)=>{for(const n of names){const i=hdr.indexOf(n);if(i>=0)return i}return -1};
-  const iDate=ix('date'),iSym=ix('symbol','ticker','scrip'),iQty=ix('qty','quantity','units'),iType=ix('type','side'),iPrice=ix('price','rate'),iClose=ix('close','nav','value'),iCls=ix('class','asset class','assetclass'),iName=ix('name','instrument'),iFund=ix('fund','portfolio','strategy');
+  const iDate=ix('date'),iSym=ix('symbol','ticker','scrip'),iQty=ix('qty','quantity','units'),iType=ix('type','side'),iPrice=ix('price','rate'),iClose=ix('close','nav','value'),iCls=ix('class','asset class','assetclass'),iName=ix('name','instrument'),iFund=ix('fund','portfolio','strategy'),iProduct=ix('product','productmode','trade product','mode');
   if(iDate<0||iSym<0)return {err:'The header needs at least "date" and "symbol" columns.'};
   const isTx=iQty>=0&&iPrice>=0;
   const isPx=!isTx&&(iClose>=0||iPrice>=0);
@@ -1104,7 +1120,9 @@ function importCSV(text){
       const ty=iType>=0?String(x[iType]).trim().toUpperCase():'BUY';
       const type=ty==='SHORT'||ty==='SHORT SELL'?'SHORT':ty==='COVER'||ty==='COVER SHORT'?'COVER':ty.startsWith('S')?'SELL':'BUY';
       if(!date||!sym||!(qty>0)||!(price>=0)){bad++;continue}
-      S.txns.push({id:S.nextId++,date,symbol:sym,type,qty,price,fund:fundOf(iFund>=0?x[iFund]:'')});ok++;
+      const rawProduct=iProduct>=0?String(x[iProduct]||'').trim().toUpperCase().replace(/[ -]+/g,'_'):'';
+      const productMode=['AUTO','EQ_DELIVERY','EQ_INTRADAY','EQ_MTF','EQ_FUTURES','EQ_OPTIONS','COM_FUTURES','COM_OPTIONS'].includes(rawProduct)?rawProduct:'AUTO';
+      S.txns.push({id:S.nextId++,date,symbol:sym,type,qty,price,fund:fundOf(iFund>=0?x[iFund]:''),productMode});ok++;
       const cl=iCls>=0?String(x[iCls]).trim():'';
       const cls=normClass(cl)||(cl.toLowerCase()==='index'?'Index':null);
       const old=S.meta[sym]||{};
@@ -1379,7 +1397,8 @@ $('#txnForm').addEventListener('submit',e=>{
     const availableAfter=cashNow+qty*price-existingMargin-qty*price*1.15;
     if(availableAfter< -1e-9){msg(M,'Insufficient available cash for 115% short margin. Required for this trade: '+inr(qty*price*1.15)+'.','err');return}
   }
-  S.txns.push({id:S.nextId++,date,symbol:sym,type,qty,price,fund});
+  const productMode=$('#fProduct').value||'AUTO';
+  S.txns.push({id:S.nextId++,date,symbol:sym,type,qty,price,fund,productMode});
   const old=S.meta[sym]||{};
   S.meta[sym]={name:$('#fName').value.trim()||old.name||sym,cls:$('#fCls').value,sector:(lookedUp[sym]&&lookedUp[sym].sector)||old.sector||''};
   if(!S.series[sym])S.series[sym]={d:[date],c:[price]};
@@ -1424,7 +1443,7 @@ $('#csvGo').addEventListener('click',()=>{
   renderAll();
 });
 $('#copyTx').addEventListener('click',async()=>{
-  const lines=['date,symbol,type,qty,price,class,name,fund'].concat(sortTxns(S.txns).map(t=>[t.date,t.symbol,t.type,t.qty,t.price,(S.meta[t.symbol]||{}).cls||'',JSON.stringify((S.meta[t.symbol]||{}).name||''),JSON.stringify(fundName(t.fund))].join(',')));
+  const lines=['date,symbol,type,qty,price,class,name,fund,product'].concat(sortTxns(S.txns).map(t=>[t.date,t.symbol,t.type,t.qty,t.price,(S.meta[t.symbol]||{}).cls||'',JSON.stringify((S.meta[t.symbol]||{}).name||''),JSON.stringify(fundName(t.fund)),t.productMode||'AUTO'].join(',')));
   const text=lines.join('\n');
   try{await navigator.clipboard.writeText(text);msg($('#dataMsg'),'Copied '+(lines.length-1)+' transactions.','ok')}
   catch(e){$('#csvIn').value=text;$('#csvIn').select();msg($('#dataMsg'),'Clipboard blocked. The CSV is in the import box above, ready to copy.','')}
@@ -1466,7 +1485,7 @@ $('#fDate').value=istNow().date;
 initSim();
 if(S.mode==='demo'&&!S.bench)S.bench='NIFTY50';
 let startTab='today';
-try{const h=location.hash.replace('#','');if(['today','funds','holdings','stats','bench','rebalance','data'].includes(h))startTab=h}catch(e){}
+try{const h=location.hash.replace('#','');if(['today','funds','holdings','stats','bench','rebalance','charges','data'].includes(h))startTab=h}catch(e){}
 compute();renderStatus();renderBanner();fillSymbolLists();
 setTab(startTab);
 startFeed();
