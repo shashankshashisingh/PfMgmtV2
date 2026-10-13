@@ -20,7 +20,7 @@ server.tool("get_latest_bhavcopy", "Return the latest cached NSE cash-market Bha
 });
 
 server.tool("get_bhavcopy_for_date", "Get cached NSE cash-market EQ/BE closing prices for a trading date (YYYY-MM-DD). Only dates already cached by the scheduled job are available.", {
-  date: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   symbol: z.string().optional(),
 }, async ({ date, symbol }) => {
   const data = readJson("data/bhavcopy.json", { days: {} });
