@@ -12,7 +12,7 @@ assert.equal(parsed.length, 3);
 assert.equal(parsed[0].Company, "Reliance Industries, Ltd");
 const rows = normalizeBhavcopyRows(parsed);
 assert.equal(rows.length, 2);
-assert.deepEqual(rows[0], { date: "2026-10-12", symbol: "RELIANCE", series: "EQ", close: 1450.25, previousClose: 1432.5 });
+assert.deepEqual(rows[0], { date: "2026-10-12", symbol: "RELIANCE", series: "EQ", close: 1450.25, previousClose: 1432.5, name: "Reliance Industries, Ltd" });
 const old = { series: { RELIANCE: { d: ["2026-10-09"], c: [1420] } }, meta: { RELIANCE: { name: "Reliance" } } };
 const merged = mergeBhavcopyHistory(old, rows);
 assert.deepEqual(merged.series.RELIANCE, { d: ["2026-10-09", "2026-10-12"], c: [1420, 1450.25] });
