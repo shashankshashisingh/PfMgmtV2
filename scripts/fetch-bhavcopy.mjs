@@ -89,6 +89,26 @@ const nextArchive = {
 const dates = Object.keys(nextArchive.days).sort();
 for (const date of dates.slice(0, -30)) delete nextArchive.days[date];
 
+// Permanent date-addressable archive, separate from the compact 30-day cache.
+const archiveDir = "data/bhavcopy";
+fs.mkdirSync(archiveDir, { recursive: true });
+const dayFile = `${archiveDir}/${result.date}.json`;
+if (!fs.existsSync(dayFile) || !result.cached) {
+  fs.writeFileSync(dayFile, JSON.stringify({
+    date: result.date, savedAt: stamp, source: "NSE CM Bhavcopy",
+    rowCount: allRows.length, rows: allRows,
+  }) + "\\n");
+}
+const indexFile = "data/bhavcopy-index.json";
+const archiveIndex = readJson(indexFile, { dates: [] });
+const archiveDates = new Set(archiveIndex.dates || []);
+archiveDates.add(result.date);
+const sortedArchiveDates = [...archiveDates].sort();
+fs.writeFileSync(indexFile, JSON.stringify({
+  updated: stamp, latestDate: sortedArchiveDates.at(-1) || result.date,
+  count: sortedArchiveDates.length, dates: sortedArchiveDates,
+}) + "\\n");
+
 const merged = mergeBhavcopyHistory(oldHistory, allRows);
 merged.meta = { ...(merged.meta || {}) };
 for (const row of allRows) {
@@ -103,5 +123,5 @@ fs.writeFileSync("data/bhavcopy.json", JSON.stringify(nextArchive) + "\n");
 fs.writeFileSync("data/prices.json", JSON.stringify({ updated: stamp, source: "NSE Bhavcopy (end of day)", tradingDate: result.date, prices, errors: {} }) + "\n");
 fs.writeFileSync("data/directory.json", JSON.stringify({ updated: stamp, source: "NSE Bhavcopy", symbols: directory }) + "\n");
 fs.writeFileSync("data/history.json", JSON.stringify(merged) + "\n");
-console.log(`NSE Bhavcopy ${result.date}: wrote ${allRows.length} prices and symbol names; merged daily closes into history.`);
+console.log(`NSE Bhavcopy ${result.date}: wrote ${allRows.length} prices and archived data/bhavcopy/${result.date}.json.`);
 if (failures.length) console.log(`Archive fallback attempts: ${failures.length}`);
