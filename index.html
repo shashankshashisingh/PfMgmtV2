@@ -703,7 +703,8 @@ function normalize(){
   if(tk0.length&&typeof S.targets[tk0[0]]==='number')S.targets={ALL:S.targets};
   for(const s in S.meta){const m=S.meta[s];if(m&&m.cls&&m.cls!=='Index'){m.cls=normClass(m.cls)||'Other'}}
   for(const v in S.targets){const t=S.targets[v];if(t&&typeof t==='object'){const o={};for(const c in t){const k=normClass(c)||c;o[k]=(o[k]||0)+t[c]}S.targets[v]=o}}
-  if(!Array.isArray(S.funds)||!S.funds.length)S.funds=[{id:'f1',name:'Main',bench:'',totalAssets:0}];\n  for(const f of S.funds){const a=Number(f.totalAssets);f.totalAssets=Number.isFinite(a)&&a>=0?a:0;}
+  if(!Array.isArray(S.funds)||!S.funds.length)S.funds=[{id:'f1',name:'Main',bench:'',totalAssets:0}];
+  for(const f of S.funds){const a=Number(f.totalAssets);f.totalAssets=Number.isFinite(a)&&a>=0?a:0;}
   for(const t of S.txns)if(!t.fund||!S.funds.some(f=>f.id===t.fund))t.fund=S.funds[0].id;
   const tk=Object.keys(S.targets||{});
   if(tk.length&&typeof S.targets[tk[0]]==='number')S.targets={ALL:S.targets};
@@ -1083,6 +1084,7 @@ function renderFunds(){
     const n=S.txns.filter(t=>t.fund===f.id).length;
     return '<div class="cols" style="align-items:center;margin-bottom:8px"><input data-fname="'+esc(f.id)+'" value="'+esc(f.name)+'" aria-label="Fund name" style="flex:2 1 160px">'+
       '<select data-fbench="'+esc(f.id)+'" aria-label="Benchmark for '+esc(f.name)+'" style="flex:2 1 160px">'+opt(f.bench)+'</select>'+
+      '<label class="fl" style="flex:2 1 180px">Total asset amount (₹)<input type="number" min="0" step="any" data-ftotal="'+esc(f.id)+'" value="'+(f.totalAssets||0)+'" aria-label="Total asset amount for '+esc(f.name)+'" placeholder="Enter total assets"></label>'+
       '<span class="muted" style="flex:0 0 90px">'+n+' trades</span>'+
       '<button class="btn ghost sm" data-fdel="'+esc(f.id)+'" style="flex:0 0 auto">Delete</button></div>';
   }).join('');
