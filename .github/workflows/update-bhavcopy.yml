@@ -11,6 +11,7 @@ on:
       - "scripts/fetch-bhavcopy.mjs"
       - "scripts/bhavcopy.js"
       - "package.json"
+      - "tests/**"
       - ".github/workflows/update-bhavcopy.yml"
 
 permissions:
