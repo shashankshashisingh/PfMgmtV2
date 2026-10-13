@@ -156,7 +156,7 @@ section[hidden]{display:none!important}
       <div id="navCards" class="grid3"></div>
       <div class="legend" id="navLegend" style="margin-top:14px"></div>
       <div class="chart" id="navChart"></div>
-      <p class="note">NAV = (market value of holdings + cash balance) ÷ 100,000. Unused corpus remains as cash with no assumed interest. Cash is reduced by buys and increased by sells; negative cash indicates transactions exceed the assumed corpus. NAV history uses available price history.</p>
+      <p class="note">NAV = (net market value of long positions less short liabilities + cash balance) ÷ 100,000. Short-sale proceeds increase cash while the short liability is marked to market. Required margin is 115% of current short notional and is reserved from available cash; it does not reduce NAV. NAV history uses available price history.</p>
     </div>
     <div class="panel">
       <h2>Portfolio value <span class="hint" id="valHint"></span></h2>
@@ -202,7 +202,7 @@ section[hidden]{display:none!important}
         <form class="f" id="txnForm" autocomplete="off">
           <label class="fl">Fund<select id="fFund"></select></label>
           <label class="fl">Date<input type="date" id="fDate" required></label>
-          <label class="fl">Side<select id="fType"><option value="BUY">Buy</option><option value="SELL">Sell</option></select></label>
+          <label class="fl">Side<select id="fType"><option value="BUY">Buy</option><option value="SELL">Sell</option><option value="SHORT">Short sell</option><option value="COVER">Cover short</option></select></label>
           <label class="fl">Symbol<input id="fSym" list="symList" placeholder="RELIANCE" required><datalist id="symList"></datalist></label>
           <label class="fl">Name<input id="fName" placeholder="Reliance Industries"></label>
           <label class="fl">Asset class<select id="fCls"></select></label>
@@ -214,7 +214,7 @@ section[hidden]{display:none!important}
           <button class="btn" type="submit">Add</button>
         </form>
         <div class="msg" id="txnMsg"></div>
-        <p class="note">Typing a symbol fills in the name, asset class and sector using Claude's general knowledge, so check them. Futures and options are valued as quantity times price, and short positions and margin are not modelled. Prices are not looked up: enter the current price for a new symbol, and import a price history on the Data tab for risk and benchmark statistics.</p>
+        <p class="note">Typing a symbol fills in the name, asset class and sector using Claude's general knowledge, so check them. Futures and options are valued as quantity times price. Short sales reserve margin equal to 115% of current short notional; use Cover short to close a short position. Prices are resolved from the latest available NSE Bhavcopy close or another available price.</p>
       </div>
     </details>
     <details id="priceBox">
@@ -354,9 +354,11 @@ function sortTxns(txns){return txns.slice().sort((a,b)=>a.date<b.date?-1:a.date>
 function processTxns(txns){
   const book={};
   for(const t of sortTxns(txns)){
-    const b=book[t.symbol]||(book[t.symbol]={lots:[],realised:0});
-    if(t.type==='BUY'){b.lots.push({date:t.date,qty:t.qty,price:t.price})}
-    else{let q=t.qty;while(q>1e-9&&b.lots.length){const l=b.lots[0];const take=Math.min(l.qty,q);b.realised+=take*(t.price-l.price);l.qty-=take;q-=take;if(l.qty<=1e-9)b.lots.shift()}}
+    const b=book[t.symbol]||(book[t.symbol]={lots:[],shortLots:[],realised:0});if(!b.shortLots)b.shortLots=[];
+    if(t.type==='BUY')b.lots.push({date:t.date,qty:t.qty,price:t.price});
+    else if(t.type==='SELL'){let q=t.qty;while(q>1e-9&&b.lots.length){const l=b.lots[0],take=Math.min(l.qty,q);b.realised+=take*(t.price-l.price);l.qty-=take;q-=take;if(l.qty<=1e-9)b.lots.shift()}}
+    else if(t.type==='SHORT')b.shortLots.push({date:t.date,qty:t.qty,price:t.price});
+    else if(t.type==='COVER'){let q=t.qty;while(q>1e-9&&b.shortLots.length){const l=b.shortLots[0],take=Math.min(l.qty,q);b.realised+=take*(l.price-t.price);l.qty-=take;q-=take;if(l.qty<=1e-9)b.shortLots.shift()}}
   }
   return book;
 }
@@ -365,7 +367,7 @@ function portfolioSeries(txns,dates,px){
   const qty={},value=new Array(n).fill(0),flow=new Array(n).fill(0),invested=new Array(n).fill(0);
   let ti=0,cum=0;
   for(let i=0;i<n;i++){
-    while(ti<sorted.length&&sorted[ti].date<=dates[i]){const t=sorted[ti],s=t.type==='BUY'?1:-1;qty[t.symbol]=(qty[t.symbol]||0)+s*t.qty;flow[i]+=s*t.qty*t.price;ti++}
+    while(ti<sorted.length&&sorted[ti].date<=dates[i]){const t=sorted[ti],add=['BUY','COVER'].includes(t.type),s=add?1:-1;qty[t.symbol]=(qty[t.symbol]||0)+s*t.qty;flow[i]+=s*t.qty*t.price;ti++}
     cum+=flow[i];invested[i]=cum;
     let v=0;for(const s in qty){const p=px[s];if(p&&p[i]!=null)v+=qty[s]*p[i]}
     value[i]=v;
@@ -599,23 +601,19 @@ function simTick(){
 let C=null;
 function viewTxns(){return S.view==='ALL'?S.txns:S.txns.filter(t=>t.fund===S.view)}
 function analyze(txns,px,dates,n){
-  const book=processTxns(txns);
-  const pos=[];
+  const book=processTxns(txns),pos=[];
   for(const s in book){
-    const lots=book[s].lots;const qty=sum(lots.map(l=>l.qty));
-    if(qty<=1e-9&&Math.abs(book[s].realised)<1e-9)continue;
-    const p=px[s];
-    const ltp=p?p[n-1]:NaN,prev=p&&n>1?p[n-2]:ltp;
-    const cost=sum(lots.map(l=>l.qty*l.price));
-    const value=qty*ltp;
-    pos.push({s,name:(S.meta[s]&&S.meta[s].name)||s,cls:(S.meta[s]&&S.meta[s].cls)||'Other',sector:(S.meta[s]&&S.meta[s].sector)||'',qty,cost,avg:qty?cost/qty:0,ltp,prev,
-      dayPct:prev?ltp/prev-1:0,dayPnl:qty*(ltp-prev),value,unreal:value-cost,unrealPct:cost?value/cost-1:NaN,realised:book[s].realised,lots});
+    const longs=book[s].lots,shorts=book[s].shortLots||[],longQty=sum(longs.map(l=>l.qty)),shortQty=sum(shorts.map(l=>l.qty)),qty=longQty-shortQty;
+    if(Math.abs(qty)<=1e-9&&Math.abs(book[s].realised)<=1e-9)continue;
+    const p=px[s],ltp=p?p[n-1]:NaN,prev=p&&n>1?p[n-2]:ltp,isShort=qty< -1e-9,lots=isShort?shorts:longs;
+    const cost=sum(lots.map(l=>l.qty*l.price)),value=Math.abs(qty)*ltp,netValue=qty*ltp,unreal=isShort?cost-value:value-cost;
+    pos.push({s,name:(S.meta[s]&&S.meta[s].name)||s,cls:(S.meta[s]&&S.meta[s].cls)||'Other',sector:(S.meta[s]&&S.meta[s].sector)||'',qty,cost,avg:Math.abs(qty)?cost/Math.abs(qty):0,ltp,prev,side:isShort?'SHORT':'LONG',shortQty:isShort?Math.abs(qty):0,dayPct:prev?ltp/prev-1:0,dayPnl:qty*(ltp-prev),value,netValue,unreal,unrealPct:cost?unreal/cost:NaN,realised:book[s].realised,lots,shortLots:shorts});
   }
-  const held=pos.filter(p=>p.qty>1e-9);
-  const total=sum(held.map(p=>p.value));
-  for(const p of pos)p.w=total&&p.qty>1e-9?p.value/total:0;
+  const held=pos.filter(p=>Math.abs(p.qty)>1e-9),total=sum(held.map(p=>p.value));
+  for(const p of pos)p.w=total?p.value/total:0;
+  const shortMargin=sum(held.map(p=>p.side==='SHORT'?p.value*1.15:0));
   const ps=portfolioSeries(txns,dates,px);
-  return {book,pos,held,total,ps,txns};
+  return {book,pos,held,total,shortMargin,ps,txns};
 }
 function compute(){
   const ist=istNow();
@@ -648,12 +646,12 @@ function totals(A){
   const h=A.held||[];
   const value=sum(h.map(p=>p.value)),cost=sum(h.map(p=>p.cost));
   const dayPnl=sum(h.map(p=>p.dayPnl)),realised=sum(A.pos.map(p=>p.realised));
-  const flows=sortTxns(A.txns).map(t=>({t:Date.parse(t.date+'T00:00:00Z'),amt:(t.type==='BUY'?-1:1)*t.qty*t.price}));
+  const flows=sortTxns(A.txns).map(t=>({t:Date.parse(t.date+'T00:00:00Z'),amt:(['BUY','COVER'].includes(t.type)?-1:1)*t.qty*t.price}));
   let x=NaN;
   if(flows.length&&value>0&&C.n){const end=Date.parse(C.dates[C.n-1]+'T00:00:00Z');flows.push({t:Math.max(end,flows[flows.length-1].t+86400000),amt:value});x=xirr(flows)}
   const lt={st:0,lt:0};
   const today=C.n?Date.parse(C.dates[C.n-1]+'T00:00:00Z'):0;
-  for(const p of h)for(const l of p.lots){const age=(today-Date.parse(l.date+'T00:00:00Z'))/86400000;const g=l.qty*(p.ltp-l.price);if(age>365)lt.lt+=g;else lt.st+=g}
+  for(const p of h)for(const l of p.lots){const age=(today-Date.parse(l.date+'T00:00:00Z'))/86400000;const g=p.side==='SHORT'?l.qty*(l.price-p.ltp):l.qty*(p.ltp-l.price);if(age>365)lt.lt+=g;else lt.st+=g}
   return {value,cost,unreal:value-cost,realised,dayPnl,dayPct:value-dayPnl>0?dayPnl/(value-dayPnl):0,xirr:x,term:lt};
 }
 function benchCandidates(){
@@ -763,7 +761,7 @@ function fundNavData(){
     const nav=assets.map(v=>v/FUND_UNITS);
     const last=Math.max(0,nav.length-1);
     return {f,i,tx,A,cash,assets,nav,current:nav.length?nav[last]:100,
-      cashNow:cash.length?cash[last]:FUND_CORPUS,assetsNow:assets.length?assets[last]:FUND_CORPUS,
+      cashNow:cash.length?cash[last]:FUND_CORPUS,assetsNow:assets.length?assets[last]:FUND_CORPUS,marginNow:A.shortMargin||0,availableCash:(cash.length?cash[last]:FUND_CORPUS)-(A.shortMargin||0),
       returnPct:(nav.length?nav[last]/100-1:0)};
   });
 }
@@ -778,6 +776,8 @@ function renderNav(){
       '<div class="s '+sg(r.returnPct)+'">'+pcS(r.returnPct)+' since ₹100 start</div>'+
       '<div class="note" style="display:flex;justify-content:space-between;gap:8px"><span>Assets</span><b class="mono">'+inrC(r.assetsNow)+'</b></div>'+
       '<div class="note" style="display:flex;justify-content:space-between;gap:8px;margin-top:2px"><span>Cash balance</span><b class="mono">'+inrC(r.cashNow)+'</b></div>'+
+      '<div class="note" style="display:flex;justify-content:space-between;gap:8px;margin-top:2px"><span>Short margin (115%)</span><b class="mono">'+inrC(r.marginNow)+'</b></div>'+
+      '<div class="note" style="display:flex;justify-content:space-between;gap:8px;margin-top:2px"><span>Cash after margin</span><b class="mono">'+inrC(r.availableCash)+'</b></div>'+
       '<div class="note" style="display:flex;justify-content:space-between;gap:8px;margin-top:2px"><span>Units</span><b class="mono">'+nf0.format(FUND_UNITS)+'</b></div>'+
     '</div>'
   ).join('');
@@ -855,7 +855,7 @@ function renderTxns(){
   const t=sortTxns(S.txns).reverse();
   if(!t.length){$('#txnTable').innerHTML='<div class="empty">No transactions recorded.</div>';return}
   $('#txnTable').innerHTML='<table><thead><tr><th>Date</th><th>Fund</th><th>Side</th><th>Symbol</th><th class="n">Qty</th><th class="n">Price</th><th class="n">Amount</th><th></th></tr></thead><tbody>'+
-    t.map(x=>'<tr><td>'+esc(fmtD(x.date))+'</td><td>'+esc(fundName(x.fund))+'</td><td class="'+(x.type==='BUY'?'':'loss')+'">'+(x.type==='BUY'?'Buy':'Sell')+'</td><td>'+esc(x.symbol)+'</td><td class="n">'+nm(x.qty,x.qty%1?3:0)+'</td><td class="n">'+inr(x.price,2)+'</td><td class="n">'+inr(x.qty*x.price)+'</td><td><button class="btn ghost sm" data-del="'+x.id+'" aria-label="Delete transaction">Delete</button></td></tr>').join('')+'</tbody></table>';
+    t.map(x=>'<tr><td>'+esc(fmtD(x.date))+'</td><td>'+esc(fundName(x.fund))+'</td><td class="'+(x.type==='BUY'?'':'loss')+'">'+({BUY:'Buy',SELL:'Sell',SHORT:'Short sell',COVER:'Cover short'}[x.type]||x.type)+'</td><td>'+esc(x.symbol)+'</td><td class="n">'+nm(x.qty,x.qty%1?3:0)+'</td><td class="n">'+inr(x.price,2)+'</td><td class="n">'+inr(x.qty*x.price)+'</td><td><button class="btn ghost sm" data-del="'+x.id+'" aria-label="Delete transaction">Delete</button></td></tr>').join('')+'</tbody></table>';
 }
 function fillSymbolLists(){
   const symSet=new Set(Object.keys(S.series).filter(s=>(S.meta[s]||{}).cls!=='Index'));
@@ -866,7 +866,7 @@ function fillSymbolLists(){
     $('#symList').innerHTML=[...symSet].sort().map(s=>'<option value="'+esc(s)+'">'+esc(((S.meta[s]||{}).name)||(FEED.dir[s]&&FEED.dir[s].n)||'')+'</option>').join('');
   }
   const bk=processTxns(S.txns);
-  const held=Object.keys(bk).filter(s=>sum(bk[s].lots.map(l=>l.qty))>1e-9).sort();
+  const held=Object.keys(bk).filter(s=>Math.abs(sum(bk[s].lots.map(l=>l.qty))-sum((bk[s].shortLots||[]).map(l=>l.qty)))>1e-9).sort();
   $('#pSym').innerHTML=held.map(s=>'<option>'+esc(s)+'</option>').join('');
   const cur=$('#fFund').value;
   $('#fFund').innerHTML=S.funds.map(f=>'<option value="'+esc(f.id)+'">'+esc(f.name)+'</option>').join('');
@@ -1102,7 +1102,7 @@ function importCSV(text){
     for(let r=1;r<rows.length;r++){
       const x=rows[r],date=normDate(x[iDate]),sym=String(x[iSym]||'').trim().toUpperCase(),qty=numOf(x[iQty]),price=numOf(x[iPrice]);
       const ty=iType>=0?String(x[iType]).trim().toUpperCase():'BUY';
-      const type=ty.startsWith('S')?'SELL':'BUY';
+      const type=ty==='SHORT'||ty==='SHORT SELL'?'SHORT':ty==='COVER'||ty==='COVER SHORT'?'COVER':ty.startsWith('S')?'SELL':'BUY';
       if(!date||!sym||!(qty>0)||!(price>=0)){bad++;continue}
       S.txns.push({id:S.nextId++,date,symbol:sym,type,qty,price,fund:fundOf(iFund>=0?x[iFund]:'')});ok++;
       const cl=iCls>=0?String(x[iCls]).trim():'';
@@ -1367,9 +1367,17 @@ $('#txnForm').addEventListener('submit',e=>{
   if(!date||!sym||!(qty>0)||!(price>0)||!Number.isFinite(price)){msg(M,typedPrice===''?'No market price is available for '+sym+'. Enter a trade price or load price data first.':'Enter a date, symbol, positive quantity and a valid positive price.','err');return}
   if(S.mode==='demo'){ensureUser()}
   if(!S.funds.some(f=>f.id===fund))fund=S.funds[0].id;
-  if(type==='SELL'){
-    const b=processTxns(S.txns.filter(t=>t.fund===fund))[sym],held=b?sum(b.lots.map(l=>l.qty)):0;
-    if(qty>held+1e-9){msg(M,'The '+fundName(fund)+' fund holds '+held+' of '+sym+', so you cannot sell '+qty+'.','err');return}
+  const fundTx=S.txns.filter(t=>t.fund===fund),book=processTxns(fundTx),b=book[sym]||{lots:[],shortLots:[]};
+  const longHeld=sum(b.lots.map(l=>l.qty)),shortHeld=sum((b.shortLots||[]).map(l=>l.qty));
+  if(type==='SELL'&&(shortHeld>1e-9||qty>longHeld+1e-9)){msg(M,shortHeld>1e-9?'This symbol is currently short. Use Cover short to close it.':'The '+fundName(fund)+' fund holds '+longHeld+' long shares of '+sym+', so you cannot sell '+qty+'.','err');return}
+  if(type==='SHORT'&&(longHeld>1e-9||shortHeld>1e-9)){msg(M,'Close the existing position in '+sym+' before opening a short position.','err');return}
+  if(type==='COVER'&&(shortHeld<=1e-9||qty>shortHeld+1e-9)){msg(M,'The '+fundName(fund)+' fund has '+shortHeld+' shares short in '+sym+', so it cannot cover '+qty+'.','err');return}
+  if(type==='BUY'&&shortHeld>1e-9){msg(M,'This symbol is currently short. Use Cover short to close it.','err');return}
+  if(type==='SHORT'){
+    const existingMargin=sum(Object.keys(book).map(k=>sum((book[k].shortLots||[]).map(l=>l.qty))*((marketPriceFor(k)||{}).price||price)*1.15));
+    const cashNow=FUND_CORPUS-fundTx.reduce((acc,t)=>acc+(['BUY','COVER'].includes(t.type)?1:-1)*t.qty*t.price,0);
+    const availableAfter=cashNow+qty*price-existingMargin-qty*price*1.15;
+    if(availableAfter< -1e-9){msg(M,'Insufficient available cash for 115% short margin. Required for this trade: '+inr(qty*price*1.15)+'.','err');return}
   }
   S.txns.push({id:S.nextId++,date,symbol:sym,type,qty,price,fund});
   const old=S.meta[sym]||{};
@@ -1381,7 +1389,7 @@ $('#txnForm').addEventListener('submit',e=>{
   afterDataChange();
   $('#fQty').value='';$('#fPrice').value='';$('#fCur').value='';
   const notional=qty*price;
-  msg(M,(type==='BUY'?'Bought ':'Sold ')+qty+' '+sym+' at '+inr(price,2)+' ('+inr(notional,2)+' notional)'+(typedPrice===''?' using '+market.source+'.':'.'),'ok');
+  msg(M,({BUY:'Bought ',SELL:'Sold ',SHORT:'Short sold ',COVER:'Covered '}[type]||'Traded ')+qty+' '+sym+' at '+inr(price,2)+' ('+inr(notional,2)+' notional)'+(type==='SHORT'?' · margin required at 115% ('+inr(notional*1.15)+')':'')+(typedPrice===''?' using '+market.source+'.':'.'),'ok');
   updateTradeNotional();
   renderAll();
 });
