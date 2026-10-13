@@ -1,29 +1,29 @@
--- Run this in Supabase Dashboard → SQL Editor.
-create table if not exists public.portfolio_data (
-  user_id uuid primary key references auth.users(id) on delete cascade,
+-- Run in Supabase SQL Editor if setting up this feature in a new project.
+-- The existing project already has this table and owner-based RLS policies.
+create table if not exists public.portfolios (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  app text not null,
   data jsonb not null default '{}'::jsonb,
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  primary key (user_id, app)
 );
 
-alter table public.portfolio_data enable row level security;
+alter table public.portfolios enable row level security;
 
-drop policy if exists "Users can read their own portfolio" on public.portfolio_data;
-create policy "Users can read their own portfolio"
-  on public.portfolio_data for select
-  to authenticated
-  using (auth.uid() = user_id);
+drop policy if exists "read own portfolio" on public.portfolios;
+create policy "read own portfolio"
+  on public.portfolios for select to authenticated
+  using ((select auth.uid()) = user_id);
 
-drop policy if exists "Users can insert their own portfolio" on public.portfolio_data;
-create policy "Users can insert their own portfolio"
-  on public.portfolio_data for insert
-  to authenticated
-  with check (auth.uid() = user_id);
+drop policy if exists "insert own portfolio" on public.portfolios;
+create policy "insert own portfolio"
+  on public.portfolios for insert to authenticated
+  with check ((select auth.uid()) = user_id);
 
-drop policy if exists "Users can update their own portfolio" on public.portfolio_data;
-create policy "Users can update their own portfolio"
-  on public.portfolio_data for update
-  to authenticated
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+drop policy if exists "update own portfolio" on public.portfolios;
+create policy "update own portfolio"
+  on public.portfolios for update to authenticated
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
-grant select, insert, update on public.portfolio_data to authenticated;
+grant select, insert, update on public.portfolios to authenticated;
