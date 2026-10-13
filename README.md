@@ -12,7 +12,7 @@ A single-page portfolio dashboard for Indian holdings across asset classes (equi
 - Light, dark and system themes
 
 ## Asset classes
-Equities, ETFs, Mutual Funds, Futures, Options, Commodities, REIT, InvIT, Money Market Funds, Long Term Fixed Income. Holdings are bundled under their class, with a subtotal row you can fold. Imports also accept common names (stock, etf, mf, gold, liquid, FD) and map them. Futures and options are valued as quantity times price; short positions and margin are not modelled yet.
+Equities, ETFs, Mutual Funds, Futures, Options, Commodities, REIT, InvIT, Money Market Funds, Long Term Fixed Income. Holdings are bundled under their class, with a subtotal row you can fold. Imports also accept common names (stock, etf, mf, gold, liquid, FD) and map them. Futures and options are valued as quantity times price. Stock transactions support Buy, Sell, Short sell and Cover short, with FIFO realized P&L. Short positions reserve margin equal to 115% of current short notional; the dashboard shows required margin and cash after margin. This is a portfolio simulation/ledger, not a broker margin engine, and does not place orders or enforce exchange-specific eligibility and settlement rules.
 
 ## Run
 Open `index.html` on GitHub Pages or serve the repository over HTTP. Holdings are stored in the browser's localStorage. Opening it as a `file://` URL blocks the browser from loading the repository's data files.
