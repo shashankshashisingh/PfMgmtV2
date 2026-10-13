@@ -16,8 +16,17 @@ Open `index.html` in a browser. No build step. Holdings are stored in the browse
 ## Data
 - The first load shows a simulated example portfolio.
 - Import transactions (`date,symbol,type,qty,price,class,name`) or price history (`date,symbol,close`) from the Data tab.
-- Optional live feed: a JSON endpoint returning `{"RELIANCE": 1432.5}`, polled every 30 seconds.
+- Live prices: a GitHub Action (`.github/workflows/update-prices.yml`) runs every 10 minutes during NSE hours, fetches quotes with [stock-nse-india](https://github.com/hi-imcodeman/stock-nse-india) for every symbol in `symbols.json`, and commits `data/prices.json`. The dashboard reads that file when it is served over HTTP (for example GitHub Pages) and polls it every 30 seconds.
+- Optional custom feed: any JSON endpoint returning `{"RELIANCE": 1432.5}`.
 - The symbol auto-fill (name, class, sector) only works inside Claude's artifact viewer.
+
+## Live prices setup
+1. In the repo, open Settings, then Pages, and publish the `main` branch (root). The dashboard then lives at your Pages URL.
+2. Put your symbols in `symbols.json`. The Data tab has a "Copy symbols.json" button.
+3. Run the "Update prices" workflow once from the Actions tab to check that NSE answers from GitHub's servers. NSE sometimes blocks cloud networks. If every symbol fails, the job stops and leaves the last prices in place.
+4. Open the Pages URL, import your holdings, and the status bar shows the feed time.
+
+Scheduled GitHub Actions runs can be delayed by several minutes, so treat prices as near-live, not tick-by-tick.
 
 ## Tests
 `node tests/core.test.js`

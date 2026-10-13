@@ -1,0 +1,32 @@
+name: Update prices
+
+on:
+  schedule:
+    # Every 10 minutes, Mon-Fri, 09:00-15:59 IST (03:30-10:29 UTC)
+    - cron: '*/10 3-10 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-prices
+  cancel-in-progress: false
+
+jobs:
+  prices:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-audit --no-fund
+      - run: node scripts/fetch-prices.mjs
+      - name: Commit prices
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/prices.json
+          git diff --cached --quiet || git commit -m "Update prices"
+          git push

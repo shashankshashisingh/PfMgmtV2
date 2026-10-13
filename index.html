@@ -284,6 +284,7 @@ section[hidden]{display:none!important}
         <h2>Your data</h2>
         <div class="cols">
           <button class="btn ghost" type="button" id="copyTx">Copy transactions CSV</button>
+          <button class="btn ghost" type="button" id="copySyms">Copy symbols.json</button>
           <button class="btn ghost" type="button" id="resetDemo">Load example portfolio</button>
           <button class="btn ghost" type="button" id="wipe">Clear everything</button>
         </div>
@@ -472,6 +473,7 @@ function buildDemo(){
 
 /* ---------- state ---------- */
 let S=null,DEMO_AUX=null;
+const FEED={meta:{},updated:''};
 function blank(){return {mode:'user',txns:[],meta:{},series:{},manual:{},live:{},bench:'',rf:7,targets:{},feedUrl:'',period:'1Y',sort:{k:'value',dir:-1},nextId:1}}
 function demoState(){
   const d=buildDemo();DEMO_AUX={beta:d.beta,idio:d.idio};
@@ -650,7 +652,8 @@ function renderStatus(){
   const ist=C.ist||istNow();
   const state=ist.open?'Market open':ist.preopen?'Pre-open':'Market closed';
   const feed=S.mode==='demo'?'Simulated prices':S.feedUrl?'Live feed':'Manual and imported prices';
-  $('#status').innerHTML='<span class="pill"><span class="dot '+(ist.open?'open':'')+'"></span>NSE '+state+'</span><span class="pill">'+esc(feed)+'</span><span class="mono">'+ist.stamp+' IST</span>';
+  const upd=S.mode==='user'&&S.feedUrl&&FEED.updated?' · '+new Date(FEED.updated).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Kolkata'}):'';
+  $('#status').innerHTML='<span class="pill"><span class="dot '+(ist.open?'open':'')+'"></span>NSE '+state+'</span><span class="pill">'+esc(feed+upd)+'</span><span class="mono">'+ist.stamp+' IST</span>';
 }
 function renderBanner(){
   if(S.mode==='demo'){
@@ -938,9 +941,15 @@ async function pollFeed(show){
   try{
     const res=await fetch(S.feedUrl,{cache:'no-store'});
     if(!res.ok)throw new Error('HTTP '+res.status);
-    const j=await res.json();
+    const j0=await res.json();
+    const j=j0&&j0.prices&&typeof j0.prices==='object'?j0.prices:j0;
     let n=0;
-    for(const s in j){const v=j[s],p=typeof v==='number'?v:(v&&(v.ltp!=null?v.ltp:v.price));if(isFinite(p)&&S.series[s.toUpperCase()]){S.live[s.toUpperCase()]=+p;n++}}
+    for(const s in j){
+      const v=j[s],p=typeof v==='number'?v:(v&&(v.ltp!=null?v.ltp:v.price)),K=s.toUpperCase();
+      if(v&&typeof v==='object'&&(v.name||v.sector))FEED.meta[K]={name:v.name||'',sector:v.sector||''};
+      if(isFinite(p)&&S.series[K]){S.live[K]=+p;n++}
+    }
+    if(j0&&j0.updated)FEED.updated=j0.updated;
     if(show){msg.className='msg ok';msg.textContent='Received '+n+' prices at '+istNow().stamp+' IST.'}
     renderAll();
   }catch(e){
@@ -998,8 +1007,23 @@ async function lookupSymbol(){
 $('#fLookup').addEventListener('click',lookupSymbol);
 $('#fSym').addEventListener('change',()=>{
   const s=$('#fSym').value.trim().toUpperCase();
+  const fm=FEED.meta[s];
+  if(s&&fm&&fm.name&&!$('#fName').value.trim()){
+    $('#fName').value=fm.name;lookedUp[s]={sector:fm.sector||''};
+    msg($('#txnMsg'),'Filled '+fm.name+(fm.sector?' · '+fm.sector:'')+' from the price feed.','ok');
+    return;
+  }
   if(s&&!S.meta[s]&&!$('#fName').value.trim())lookupSymbol();
 });
+async function tryRepoFeed(){
+  if(S.mode!=='user'||S.feedUrl||!/^https?:$/.test(location.protocol))return;
+  try{
+    const r=await fetch('data/prices.json',{cache:'no-store'});
+    if(!r.ok)return;
+    const j=await r.json();
+    if(j&&j.prices){S.feedUrl='data/prices.json';save();startFeed()}
+  }catch(e){}
+}
 $('#txnForm').addEventListener('submit',e=>{
   e.preventDefault();
   const date=$('#fDate').value,type=$('#fType').value,sym=$('#fSym').value.trim().toUpperCase(),qty=parseFloat($('#fQty').value),price=parseFloat($('#fPrice').value),cur=parseFloat($('#fCur').value);
@@ -1054,6 +1078,12 @@ $('#copyTx').addEventListener('click',async()=>{
   try{await navigator.clipboard.writeText(text);msg($('#dataMsg'),'Copied '+(lines.length-1)+' transactions.','ok')}
   catch(e){$('#csvIn').value=text;$('#csvIn').select();msg($('#dataMsg'),'Clipboard blocked. The CSV is in the import box above, ready to copy.','')}
 });
+$('#copySyms').addEventListener('click',async()=>{
+  const syms=[...new Set(S.txns.map(t=>t.symbol))].filter(s=>(S.meta[s]||{}).cls!=='Index').sort();
+  const text=JSON.stringify({symbols:syms},null,2)+'\n';
+  try{await navigator.clipboard.writeText(text);msg($('#dataMsg'),'Copied '+syms.length+' symbols. Paste them into symbols.json in your repo so the price job fetches them.','ok')}
+  catch(e){$('#csvIn').value=text;$('#csvIn').select();msg($('#dataMsg'),'Clipboard blocked. The JSON is in the import box above, ready to copy.','')}
+});
 $('#resetDemo').addEventListener('click',()=>{S=demoState();clearInterval(feedTimer);initSim();renderAll();msg($('#dataMsg'),'Example portfolio loaded. Your saved data is untouched until you import again.','ok')});
 $('#wipe').addEventListener('click',()=>{
   try{localStorage.removeItem(LS)}catch(e){}
@@ -1088,6 +1118,7 @@ try{const h=location.hash.replace('#','');if(['today','holdings','stats','bench'
 compute();renderStatus();renderBanner();fillSymbolLists();
 setTab(startTab);
 startFeed();
+tryRepoFeed();
 let lastHeavy=0;
 setInterval(()=>{
   const ist=istNow();
