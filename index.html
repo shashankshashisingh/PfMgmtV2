@@ -102,7 +102,7 @@ tr.sec td:first-child{padding-left:28px}
 .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .bar{height:6px;border-radius:3px;background:var(--soft);position:relative;grid-column:1/-1}
 .bar>i{position:absolute;top:0;height:100%;border-radius:3px;display:block}
-form.f{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,130px),1fr));gap:10px;align-items:end}
+form.f{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;align-items:start}\n@media(max-width:900px){form.f{grid-template-columns:repeat(3,minmax(0,1fr))}}\n@media(max-width:560px){form.f{grid-template-columns:repeat(2,minmax(0,1fr))}}
 label.fl{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
 input,select,textarea{font:inherit;font-size:13px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px;min-width:0;width:100%}
 input[type=number]{font-family:var(--mono)}
@@ -254,7 +254,7 @@ section[hidden]{display:none!important}
           <label class="fl">Asset class<select id="fCls"></select></label>
           <label class="fl">Quantity / units<input type="number" id="fQty" step="any" min="0" required><span class="note" id="fQtyAvailable" aria-live="polite">Available shares will appear when you select a symbol and trade side.</span></label>
           <label class="fl">Trade price (₹)<input type="number" id="fPrice" step="any" min="0" placeholder="Blank = market price"></label>
-          <label class="fl">Current price (₹)<input type="number" id="fCur" step="any" min="0" placeholder="optional"></label>
+          <label class="fl">Current price (₹)<input type="number" id="fCur" step="any" min="0" placeholder="optional"><span class="note" id="fPortfolioQty" aria-live="polite">Portfolio shares: —</span></label>
           <div class="fl" style="grid-column:1/-1;border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:12px"><span><b>Notional trade value</b><span class="note" id="tradeValueHint" style="display:block;margin:2px 0 0">Quantity × trade price</span></span><b class="mono" id="tradeNotional">—</b></div>
           <button class="btn ghost" type="button" id="fLookup">Look up symbol</button>
           <button class="btn" type="submit">Add</button>
@@ -1667,15 +1667,17 @@ function updateTradeNotional(){
 ['fSym','fPrice'].forEach(id=>$('#'+id).addEventListener('change',updateTradeNotional));
 function updateAvailableQuantity(){
   const fund=$('#fFund').value,type=$('#fType').value,sym=$('#fSym').value.trim().toUpperCase();
-  const qty=$('#fQty'),hint=$('#fQtyAvailable');
+  const qty=$('#fQty'),hint=$('#fQtyAvailable'),portfolioHint=$('#fPortfolioQty');
   if(!qty||!hint)return;
   qty.removeAttribute('max');
+  const book=sym?(processTxns(S.txns.filter(t=>t.fund===fund))[sym]||{lots:[],shortLots:[]}):{lots:[],shortLots:[]};
+  const longQty=sum(book.lots.map(l=>l.qty)),shortQty=sum((book.shortLots||[]).map(l=>l.qty));
+  const netQty=longQty-shortQty;
+  if(portfolioHint)portfolioHint.textContent='Portfolio shares: '+(netQty>1e-9?'+':netQty< -1e-9?'−':'')+nm(Math.abs(netQty),Math.abs(netQty)%1?3:0);
   if(!sym||!['SELL','COVER'].includes(type)){
     hint.textContent=type==='SELL'?'Select a symbol to see shares available to sell.':type==='COVER'?'Select a symbol to see shares available to cover.':'Available quantity is shown for Sell and Cover short.';
     return;
   }
-  const book=processTxns(S.txns.filter(t=>t.fund===fund))[sym]||{lots:[],shortLots:[]};
-  const longQty=sum(book.lots.map(l=>l.qty)),shortQty=sum((book.shortLots||[]).map(l=>l.qty));
   const available=type==='SELL'?longQty:shortQty;
   qty.max=String(Math.max(0,available));
   hint.textContent='Available to '+(type==='SELL'?'sell':'cover')+' in '+fundName(fund)+': '+nm(Math.max(0,available),Math.max(0,available)%1?3:0)+' shares.';
