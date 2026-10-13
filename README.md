@@ -56,3 +56,7 @@ GitHub Actions refreshes the cache; it does not host a persistent MCP endpoint. 
 ## Roadmap
 - Dividends and corporate actions
 - Tax-lot reports
+
+
+## Historical NSE Bhavcopy archive
+The `Update NSE Bhavcopy` GitHub Actions workflow stores each available trading day's normalized NSE cash-market EQ/BE closing-price snapshot in `data/bhavcopy/YYYY-MM-DD.json` and maintains `data/bhavcopy-index.json`. The Data tab provides a date selector, table preview and JSON download. The compact `data/bhavcopy.json` file remains a latest-30-day cache. Archive rows include trading date, symbol, series, close, previous close and company name; this is a normalized closing-price archive, not the full raw NSE exchange CSV with every field.
