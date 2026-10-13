@@ -1038,6 +1038,7 @@ function chargeProduct(t){
   const raw=t.productMode||'AUTO';
   if(raw!=='AUTO'&&PRODUCT_LABELS[raw])return raw;
   const cls=(S.meta[t.symbol]||{}).cls||'Equities';
+  if(['SHORT','COVER'].includes(t.type)&&(cls==='Equities'||cls==='ETFs'))return 'EQ_INTRADAY';
   if(cls==='Futures')return 'EQ_FUTURES';
   if(cls==='Options')return 'EQ_OPTIONS';
   if(cls==='Commodities')return 'COM_FUTURES';
@@ -1056,15 +1057,15 @@ function calculateCharges(){
     if(['EQ_DELIVERY','EQ_INTRADAY','EQ_MTF'].includes(product)){
       const r=product==='EQ_DELIVERY'?CHARGE_RATES.equity.delivery:product==='EQ_INTRADAY'?CHARGE_RATES.equity.intraday:CHARGE_RATES.equity.mtf;
       brokerage=r.brokerage!=null?r.brokerage:Math.min(r.cap,notional*r.rate);
-      exchange=notional*r.txn;stt=notional*(buy?(r.sttBuy||0):(r.sttSell||0));stamp=buy?notional*(r.stampBuy||0):0;ipft=notional*CHARGE_RATES.ipft;
+      exchange=notional*r.txn;stt=Math.round(notional*(buy?(r.sttBuy||0):(r.sttSell||0)));stamp=buy?Math.round(notional*(r.stampBuy||0)):0;ipft=notional*CHARGE_RATES.ipft;
       if(product==='EQ_DELIVERY'||product==='EQ_MTF')excluded='NSE assumed; DP charge grouped by fund/date/symbol';
     }else if(['EQ_FUTURES','EQ_OPTIONS'].includes(product)){
       const r=product==='EQ_FUTURES'?CHARGE_RATES.derivatives.futures:CHARGE_RATES.derivatives.options;
-      brokerage=r.brokerage;exchange=notional*r.txn;stt=sell?notional*r.sttSell:0;stamp=buy?notional*r.stampBuy:0;
+      brokerage=r.brokerage;exchange=notional*r.txn;stt=sell?Math.round(notional*r.sttSell):0;stamp=buy?Math.round(notional*r.stampBuy):0;
       if(product==='EQ_OPTIONS')excluded='Expiry/exercise/assignment fees not identified separately';
     }else if(['COM_FUTURES','COM_OPTIONS'].includes(product)){
       const r=product==='COM_FUTURES'?CHARGE_RATES.commodity.futures:CHARGE_RATES.commodity.options;
-      brokerage=r.brokerage;stt=sell?notional*r.sttSell:0;stamp=buy?notional*r.stampBuy:0;
+      brokerage=r.brokerage;stt=sell?Math.round(notional*r.sttSell):0;stamp=buy?Math.round(notional*r.stampBuy):0;
       excluded='Commodity exchange transaction levies omitted; exact contract/exchange rates not available';
     }else{sebi=0;excluded='No trading brokerage applied to this asset class'}
     const gst=(brokerage+exchange+sebi+ipft)*CHARGE_RATES.gst;
