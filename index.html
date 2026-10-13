@@ -517,8 +517,8 @@ const clsColor=c=>'var(--c'+(Math.max(0,CLASSES.indexOf(c))+1)+')';
 const PERIODS=['1M','3M','6M','YTD','1Y','All'];
 const LS='portfolio-desk.v1';
 
-const CLOUD_TABLE='portfolio_data';
-let cloudClient=null,cloudUser=null,cloudReady=false,cloudSaveTimer=null,accountMode='login';
+const CLOUD_TABLE='portfolios',CLOUD_APP='portfolio-mgmt';
+let cloudClient=null,cloudUser=null,cloudReady=false,cloudSaveTimer=null,accountMode='login',removeLocalAfterCloudSave=false;
 function cloudConfigured(){
   return typeof window.PORTFOLIO_SUPABASE_URL==='string'&&window.PORTFOLIO_SUPABASE_URL.startsWith('https://')&&
     typeof window.PORTFOLIO_SUPABASE_ANON_KEY==='string'&&window.PORTFOLIO_SUPABASE_ANON_KEY.length>20&&
@@ -530,20 +530,20 @@ function accountStatus(message){
   const logout=document.getElementById('accountLogout');
   if(logout)logout.hidden=!cloudUser;
   const open=document.getElementById('accountOpen');
-  if(open)open.textContent=cloudUser?'Account':'Sign in / Sign up';
+  if(open){open.textContent=cloudUser?'Account':'Sign in / Sign up';open.hidden=!!cloudUser;}
 }
 function accountMessage(message){const el=document.getElementById('accountMessage');if(el)el.textContent=message||''}
 function openAccount(mode='login'){
   accountMode=mode;
   const overlay=document.getElementById('accountOverlay');
   overlay.setAttribute('aria-hidden','false');
-  document.getElementById('accountTitle').textContent=mode==='signup'?'Create your account':mode==='reset'?'Reset your password':'Sign in to Portfolio Desk';
-  document.getElementById('accountIntro').textContent=mode==='signup'?'Create an account to keep your portfolio synced across devices.':mode==='reset'?'We will email you a password reset link.':'Your holdings and transactions will be saved to your private cloud account.';
+  document.getElementById('accountTitle').textContent=mode==='signup'?'Create your account':mode==='reset'?'Reset your password':mode==='newpassword'?'Choose a new password':'Sign in to Portfolio Desk';
+  document.getElementById('accountIntro').textContent=mode==='signup'?'Create an account to keep your portfolio synced across devices.':mode==='reset'?'We will email you a password reset link.':mode==='newpassword'?'Choose a new password for your account.':'Your holdings and transactions will be saved to your private cloud account.';
   document.getElementById('accountPassword').hidden=mode==='reset';
   document.querySelector('label[for="accountPassword"]').hidden=mode==='reset';
   document.getElementById('accountPassword').required=mode!=='reset';
-  document.getElementById('accountSubmit').textContent=mode==='signup'?'Create account':mode==='reset'?'Send reset link':'Sign in';
-  document.getElementById('accountSwitch').hidden=mode==='reset';
+  document.getElementById('accountSubmit').textContent=mode==='signup'?'Create account':mode==='reset'?'Send reset link':mode==='newpassword'?'Update password':'Sign in';
+  document.getElementById('accountSwitch').hidden=mode==='reset'||mode==='newpassword';
   document.getElementById('accountReset').hidden=mode!=='login';
   accountMessage('');
   if(!cloudConfigured())accountMessage('Cloud login is not configured yet. Complete the Supabase setup in SUPABASE_SETUP.md.');
@@ -560,9 +560,9 @@ function portfolioSnapshot(){
 async function persistCloudNow(){
   if(!cloudClient||!cloudUser||!cloudReady||S.mode!=='user')return;
   const snapshot=portfolioSnapshot();
-  const {error}=await cloudClient.from(CLOUD_TABLE).upsert({user_id:cloudUser.id,data:snapshot,updated_at:new Date().toISOString()},{onConflict:'user_id'});
+  const {error}=await cloudClient.from(CLOUD_TABLE).upsert({user_id:cloudUser.id,app:CLOUD_APP,data:snapshot,updated_at:new Date().toISOString()},{onConflict:'user_id,app'});
   if(error)throw error;
-  try{localStorage.removeItem(LS)}catch(e){}
+  if(removeLocalAfterCloudSave){try{localStorage.removeItem(LS)}catch(e){}removeLocalAfterCloudSave=false;}
   accountStatus('Cloud saved · '+cloudUser.email);
 }
 function scheduleCloudSave(){
@@ -572,14 +572,14 @@ function scheduleCloudSave(){
 }
 async function loadCloudPortfolio(user){
   cloudReady=false;cloudUser=user;accountStatus('Loading cloud portfolio…');
-  const {data,error}=await cloudClient.from(CLOUD_TABLE).select('data').eq('user_id',user.id).maybeSingle();
+  const {data,error}=await cloudClient.from(CLOUD_TABLE).select('data').eq('user_id',user.id).eq('app',CLOUD_APP).maybeSingle();
   if(error)throw error;
   if(data&&data.data&&typeof data.data==='object'){
-    S=Object.assign(blank(),data.data);S.live={};S.feedUrl='';normalize();
+    S=Object.assign(blank(),data.data);S.live={};S.feedUrl='';normalize();removeLocalAfterCloudSave=false;
   }else{
     const local=localPortfolioForMigration();
-    if(local){S=Object.assign(blank(),local);S.live={};S.feedUrl='';normalize()}
-    else {S=blank();normalize()}
+    if(local){S=Object.assign(blank(),local);S.live={};S.feedUrl='';normalize();removeLocalAfterCloudSave=true}
+    else {S=blank();normalize();removeLocalAfterCloudSave=false}
   }
   cloudReady=true;
   await persistCloudNow();
@@ -593,9 +593,9 @@ async function initCloudAuth(){
   const {data,error}=await cloudClient.auth.getSession();
   if(error){cloudReady=true;accountStatus('Sign in unavailable');console.error(error);return}
   if(data.session){
-    try{await loadCloudPortfolio(data.session.user)}
+    try{await loadCloudPortfolio(data.session.user);if(window.location.hash.includes('type=recovery'))openAccount('newpassword')}
     catch(e){cloudReady=true;console.error('Cloud portfolio load failed',e);accountStatus('Cloud connection error')}
-  }else{cloudReady=true;accountStatus('Not signed in · browser storage')}
+  }else{cloudReady=true;accountStatus('Not signed in · browser storage');if(window.location.hash.includes('type=recovery')){openAccount('login');accountMessage('This password reset link may have expired. Request a new one.')}}
 }
 
 const DEMO_TARGETS={'Equities':35,'ETFs':15,'Mutual Funds':20,'Commodities':5,'REIT':5,'InvIT':5,'Money Market Funds':5,'Long Term Fixed Income':10};
@@ -1743,6 +1743,11 @@ document.getElementById('accountForm').addEventListener('submit',async e=>{
       const {error}=await cloudClient.auth.resetPasswordForEmail(email,{redirectTo:PAGES_URL});
       if(error)throw error;
       accountMessage('If an account exists for that email, a password reset link will be sent.');
+    }else if(accountMode==='newpassword'){
+      const {error}=await cloudClient.auth.updateUser({password});
+      if(error)throw error;
+      closeAccount();accountStatus('Password updated');
+      try{history.replaceState(null,'',PAGES_URL)}catch(e){}
     }else if(accountMode==='signup'){
       const {data,error}=await cloudClient.auth.signUp({email,password,options:{emailRedirectTo:PAGES_URL}});
       if(error)throw error;
