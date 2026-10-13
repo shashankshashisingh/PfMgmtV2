@@ -256,11 +256,11 @@ details>.in{padding:0 17px 17px}
   <section id="tab-today" class="stack">
     <div class="strip" id="kpis"></div>
     <div class="panel">
-      <h2>Fund NAV <span class="hint">₹1 crore corpus · 100,000 units per fund</span></h2>
+      <h2>Fund NAV <span class="hint">Each fund uses its configured AUM and NAV units</span></h2>
       <div id="navCards" class="grid3"></div>
       <div class="legend" id="navLegend" style="margin-top:14px"></div>
       <div class="chart" id="navChart"></div>
-      <p class="note">NAV = (net market value of long positions less short liabilities + cash balance) ÷ 100,000. Short-sale proceeds increase cash while the short liability is marked to market. Required margin is 115% of current short notional and is reserved from available cash; it does not reduce NAV. NAV history uses available price history.</p>
+      <p class="note">NAV = (net market value of long positions less short liabilities + cash balance) ÷ that fund’s configured NAV units. Short-sale proceeds increase cash while the short liability is marked to market. Required margin is 115% of current short notional and is reserved from available cash; it does not reduce NAV. NAV history uses available price history.</p>
     </div>
     <div class="panel">
       <h2>Portfolio value <span class="hint" id="valHint"></span></h2>
@@ -1166,11 +1166,11 @@ function renderFunds(){
       '<td class="n">'+inrC(acc.assetsNow)+'</td><td class="n">'+pc(share,1)+'</td><td class="n">'+(aum>0?inrC(aum):'—')+'</td>'+
       '<td class="n">'+inrC(acc.cashNow)+'</td><td class="n">'+inrC(used)+'</td><td class="n '+(acc.availableCash<0?'loss':'')+'">'+inrS(acc.availableCash)+'</td>'+
       '<td class="n '+sg(acc.dayPnl)+'">'+inrS(acc.dayPnl)+' <span class="muted">('+pcS(acc.dayPct,1)+')</span></td>'+
-      '<td class="n '+sg(st.total)+'">'+pcS(st.total)+'</td><td class="n '+sg(ex)+'">'+pcS(ex)+'</td><td class="n '+sg(acc.annualized)+'">'+pcS(acc.annualized,1)+'</td>'+
+      '<td class="n '+sg(st.total)+'">'+pcS(st.total)+'</td><td class="n '+sg(acc.returnPct)+'">'+pcS(acc.returnPct)+'</td><td class="n '+sg(ex)+'">'+pcS(ex)+'</td><td class="n '+sg(acc.annualized)+'">'+pcS(acc.annualized,1)+'</td>'+
       '<td class="n">'+pc(st.vol)+'</td><td class="n">'+nm(st.sharpe)+'</td><td class="n loss">'+(isFinite(st.mdd)?pc(st.mdd):'—')+'</td>'+
       '<td class="n">'+nm(r.rel.beta)+'</td><td class="n '+sg(r.rel.alpha)+'">'+pcS(r.rel.alpha)+'</td></tr>';
   };
-  $('#fundTable').innerHTML='<table><thead><tr><th>Fund</th><th>Benchmark</th><th class="n">Net assets</th><th class="n">Weight</th><th class="n">Starting AUM</th><th class="n">Cash</th><th class="n">Used / margin</th><th class="n">Available cash</th><th class="n">Today</th><th class="n">Return</th><th class="n">vs bench</th><th class="n">XIRR</th><th class="n">Volatility</th><th class="n">Sharpe</th><th class="n">Max drawdown</th><th class="n">Beta</th><th class="n">Alpha</th></tr></thead><tbody>'+rows.map((r,i)=>cell(r,i)).join('')+cell(all,-1)+'</tbody></table>';
+  $('#fundTable').innerHTML='<table><thead><tr><th>Fund</th><th>Benchmark</th><th class="n">Net assets</th><th class="n">Weight</th><th class="n">Starting AUM</th><th class="n">Cash</th><th class="n">Used / margin</th><th class="n">Available cash</th><th class="n">Today</th><th class="n">Period return</th><th class="n">Return on AUM</th><th class="n">vs bench</th><th class="n">XIRR</th><th class="n">Volatility</th><th class="n">Sharpe</th><th class="n">Max drawdown</th><th class="n">Beta</th><th class="n">Alpha</th></tr></thead><tbody>'+rows.map((r,i)=>cell(r,i)).join('')+cell(all,-1)+'</tbody></table>';
   const cands=benchCandidates(),opt=sel=>'<option value="">Default ('+esc(S.bench||'none')+')</option>'+cands.map(c=>'<option value="'+esc(c)+'"'+(c===sel?' selected':'')+'>'+esc(((S.meta[c]||{}).name||c))+'</option>').join('');
   $('#fundMgmt').innerHTML=S.funds.map(f=>{
     const n=S.txns.filter(t=>t.fund===f.id).length;
