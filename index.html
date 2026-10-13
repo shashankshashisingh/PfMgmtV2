@@ -635,7 +635,7 @@ function compute(){
   else if(hasLive&&ist.date===lastHist){for(const s in px)if(L[s]!=null)px[s][px[s].length-1]=L[s]}
   const n=dates.length;
   for(const s in px)if(S.series[s].d.length<=2&&L[s]!=null)px[s][n-1]=L[s];
-  C=Object.assign({dates,px,n,ist,liveOn},analyze(viewTxns(),px,dates,n));
+  C=Object.assign({dates,px,n,ist,liveOn,L},analyze(viewTxns(),px,dates,n));
 }
 function totals(A){
   A=A||C;
@@ -872,11 +872,12 @@ function renderFunds(){
   }).join('');
   $('#nfBench').innerHTML=opt('');
 }
+function benchEnd(b){return (b&&C.liveOn&&!(C.L&&C.L[b]!=null))?C.n-1:C.n}
 function periodDataFor(A,b){
   const from=rangeFor(A),ps=A.ps;
   const pr=[],br=[];
-  const bp=b?C.px[b]:null;
-  for(let i=from+1;i<C.n;i++){if(ps.ret[i]!=null&&bp){pr.push(ps.ret[i]);br.push(bp[i]/bp[i-1]-1)}else if(ps.ret[i]!=null){pr.push(ps.ret[i])}}
+  const bp=b?C.px[b]:null,end=benchEnd(b);
+  for(let i=from+1;i<end;i++){if(ps.ret[i]!=null&&bp){pr.push(ps.ret[i]);br.push(bp[i]/bp[i-1]-1)}else if(ps.ret[i]!=null){pr.push(ps.ret[i])}}
   return {from,pr,br:bp?br:null,b,bp};
 }
 function periodData(){return periodDataFor(C,benchSym())}
@@ -931,13 +932,13 @@ function renderBench(){
    '<div><div class="k">'+esc(bname)+'</div><div class="v '+sg(sb.total)+'">'+pcS(sb.total)+'</div><div class="s muted">'+S.period+'</div></div>'+
    '<div><div class="k">Excess return</div><div class="v '+sg(ex)+'">'+pcS(ex)+'</div><div class="s muted">portfolio minus benchmark</div></div>'+
    '<div><div class="k">Beta · Alpha</div><div class="v">'+nm(rel.beta)+'</div><div class="s '+sg(rel.alpha)+'">'+pcS(rel.alpha)+' a year</div></div>';
-  const d=slice(C.dates,from),pi=C.ps.idx[from],bi=D.bp[from];
+  const E=benchEnd(cur),d=C.dates.slice(from,E),pi=C.ps.idx[from],bi=D.bp[from];
   $('#rebHint').textContent=d.length?fmtD(d[0])+' = 100':'';
   lineChart($('#rebChart'),d,[
-    {name:bname,color:'var(--bench)',vals:slice(D.bp,from).map(v=>v/bi*100),dash:true,w:1.8},
-    {name:'Portfolio',color:'var(--accent)',vals:slice(C.ps.idx,from).map(v=>v==null?null:v/pi*100)}
+    {name:bname,color:'var(--bench)',vals:D.bp.slice(from,E).map(v=>v/bi*100),dash:true,w:1.8},
+    {name:'Portfolio',color:'var(--accent)',vals:C.ps.idx.slice(from,E).map(v=>v==null?null:v/pi*100)}
   ],{yf:v=>v.toFixed(0),label:'Portfolio against benchmark, rebased to 100',yw:44});
-  const bdd=maxDrawdown(slice(D.bp,from)).dd,pdd=maxDrawdown(slice(C.ps.idx,from).map(x=>x==null?100:x)).dd;
+  const bdd=maxDrawdown(D.bp.slice(from,E)).dd,pdd=maxDrawdown(C.ps.idx.slice(from,E).map(x=>x==null?100:x)).dd;
   lineChart($('#ddBenchChart'),d,[{name:bname,color:'var(--bench)',vals:bdd,dash:true,w:1.8},{name:'Portfolio',color:'var(--accent)',vals:pdd}],{yf:v=>pc(v,0),zeroTop:true,label:'Drawdowns',yw:46});
   const R=(l,a,b,note)=>'<tr><td>'+l+'</td><td class="n">'+a+'</td><td class="n">'+b+'</td></tr>';
   $('#benchTable').innerHTML='<table><thead><tr><th>Metric</th><th class="n">Portfolio</th><th class="n">'+esc(cur)+'</th></tr></thead><tbody>'+
@@ -1262,12 +1263,18 @@ function renderRepoStatus(){
   if(REPO.env==='file'){
     el.innerHTML='<p>This page was opened from a file, so the browser blocks reading the price files. Serve it over http, for example from GitHub Pages.</p>';return}
   if(!REPO.env){el.innerHTML='<p class="muted">Checking…</p>';return}
-  const errs=Object.entries(REPO.priceErrors||{}).slice(0,3).map(e=>esc(e[0])+': '+esc(e[1])).join('<br>');
+  const pe=REPO.priceErrors||{};
+  const errs=Object.entries(pe).filter(e=>!e[0].startsWith('_')).slice(0,3).map(e=>esc(e[0])+': '+esc(e[1])).join('<br>');
+  const bulkBlocked=!!(pe._bulk||pe._indices);
+  const heldSyms=[...new Set(S.txns.map(t=>t.symbol))];
+  const noFeed=S.mode==='user'&&FEED.raw&&FEED.raw.prices?heldSyms.filter(s=>!FEED.raw.prices[s]):[];
   const pOk=REPO.priceCount>0&&!!REPO.priceUpdated;
   el.innerHTML=
     line(pOk,'Live prices',pOk?REPO.priceCount+' symbols, updated '+ago(REPO.priceUpdated)+(S.mode==='demo'?'. The example portfolio uses simulated prices.':''):(REPO.priceErr?'could not read data/prices.json ('+esc(REPO.priceErr)+')':'data/prices.json is empty. In your repo, open Actions and run "Update prices".'))+
     line(REPO.dirCount>0,'Symbol list',REPO.dirCount>0?REPO.dirCount.toLocaleString('en-IN')+' symbols for lookup':(REPO.dirErr?'could not read data/directory.json ('+esc(REPO.dirErr)+')':'not built yet. It is created by the same "Update prices" run.'))+
     line(REPO.histCount>0,'Price history',REPO.histCount>0?REPO.histCount+' series, updated '+ago(REPO.histUpdated):(REPO.histErr?'could not read data/history.json ('+esc(REPO.histErr)+')':'empty. Run "Update price history" in Actions. It feeds the statistics and benchmark tabs.'))+
+    (bulkBlocked?'<p class="note">NSE refuses the bulk quote call from GitHub, so live prices come one symbol at a time and only for symbols listed in <span class="mono">symbols.json</span>. Today\'s benchmark level is also missing, so benchmark statistics stop at the last close.</p>':'')+
+    (noFeed.length?'<p class="note loss">No live price yet for '+noFeed.map(esc).join(', ')+'. Add '+(noFeed.length>1?'them':'it')+' to <span class="mono">symbols.json</span> in your repo (use Copy symbols.json below) and the next run picks '+(noFeed.length>1?'them':'it')+' up.</p>':'')+
     (errs?'<p class="note">Last job reported: '+errs+'</p>':'')+
     ((!pOk||!REPO.dirCount)?'<p class="note">If a job shows a red cross in Actions, NSE is probably blocking GitHub\'s servers. The job log has the reason.</p>':'');
 }

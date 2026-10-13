@@ -37,7 +37,7 @@ Setup:
 2. Put your symbols in `symbols.json`. The Data tab has a "Copy symbols.json" button. Committing the file runs both jobs.
 3. Open the Data tab: "Live data status" shows what loaded and what did not.
 
-Scheduled runs can be delayed by several minutes, so prices are near-live. NSE sometimes blocks cloud servers. If a job fails, the log in the Actions tab has the reason, and the dashboard keeps the last good data.
+From GitHub's servers NSE currently refuses the bulk NIFTY 500 quote call and the live index levels (HTTP 403), but single-stock quotes, the symbol list and daily history work. So live prices cover only the symbols in `symbols.json`, and benchmark statistics run up to the last close. Scheduled runs can be delayed by several minutes, so prices are near-live. NSE sometimes blocks cloud servers. If a job fails, the log in the Actions tab has the reason, and the dashboard keeps the last good data.
 
 The Claude preview cannot reach NSE or this repository, so symbol lookup there uses Claude and prices are not live.
 
