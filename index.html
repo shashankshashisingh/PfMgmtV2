@@ -252,7 +252,7 @@ section[hidden]{display:none!important}
           <label class="fl">Symbol<input id="fSym" list="symList" placeholder="RELIANCE" required><datalist id="symList"></datalist></label>
           <label class="fl">Name<input id="fName" placeholder="Reliance Industries"></label>
           <label class="fl">Asset class<select id="fCls"></select></label>
-          <label class="fl">Quantity / units<input type="number" id="fQty" step="any" min="0" required></label>
+          <label class="fl">Quantity / units<input type="number" id="fQty" step="any" min="0" required><span class="note" id="fQtyAvailable" aria-live="polite">Available shares will appear when you select a symbol and trade side.</span></label>
           <label class="fl">Trade price (₹)<input type="number" id="fPrice" step="any" min="0" placeholder="Blank = market price"></label>
           <label class="fl">Current price (₹)<input type="number" id="fCur" step="any" min="0" placeholder="optional"></label>
           <div class="fl" style="grid-column:1/-1;border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:12px"><span><b>Notional trade value</b><span class="note" id="tradeValueHint" style="display:block;margin:2px 0 0">Quantity × trade price</span></span><b class="mono" id="tradeNotional">—</b></div>
@@ -1029,6 +1029,7 @@ function fillSymbolLists(){
   const cur=$('#fFund').value;
   $('#fFund').innerHTML=S.funds.map(f=>'<option value="'+esc(f.id)+'">'+esc(f.name)+'</option>').join('');
   $('#fFund').value=S.funds.some(f=>f.id===cur)?cur:(S.view!=='ALL'?S.view:S.funds[0].id);
+  updateAvailableQuantity();
 }
 function fundName(id){const f=S.funds.find(x=>x.id===id);return f?f.name:'—'}
 function renderFundbar(){
@@ -1659,6 +1660,25 @@ function updateTradeNotional(){
 }
 ['fSym','fQty','fPrice','fType'].forEach(id=>$('#'+id).addEventListener('input',updateTradeNotional));
 ['fSym','fPrice'].forEach(id=>$('#'+id).addEventListener('change',updateTradeNotional));
+function updateAvailableQuantity(){
+  const fund=$('#fFund').value,type=$('#fType').value,sym=$('#fSym').value.trim().toUpperCase();
+  const qty=$('#fQty'),hint=$('#fQtyAvailable');
+  if(!qty||!hint)return;
+  qty.removeAttribute('max');
+  if(!sym||!['SELL','COVER'].includes(type)){
+    hint.textContent=type==='SELL'?'Select a symbol to see shares available to sell.':type==='COVER'?'Select a symbol to see shares available to cover.':'Available quantity is shown for Sell and Cover short.';
+    return;
+  }
+  const book=processTxns(S.txns.filter(t=>t.fund===fund))[sym]||{lots:[],shortLots:[]};
+  const longQty=sum(book.lots.map(l=>l.qty)),shortQty=sum((book.shortLots||[]).map(l=>l.qty));
+  const available=type==='SELL'?longQty:shortQty;
+  qty.max=String(Math.max(0,available));
+  hint.textContent='Available to '+(type==='SELL'?'sell':'cover')+' in '+fundName(fund)+': '+nm(Math.max(0,available),Math.max(0,available)%1?3:0)+' shares.';
+  if(available<=1e-9)hint.textContent+=' No eligible position recorded for this fund and symbol.';
+}
+['fFund','fType','fSym'].forEach(id=>$('#'+id).addEventListener('change',updateAvailableQuantity));
+['fSym','fType'].forEach(id=>$('#'+id).addEventListener('input',updateAvailableQuantity));
+
 $('#txnForm').addEventListener('submit',e=>{
   e.preventDefault();
   let fund=$('#fFund').value;
