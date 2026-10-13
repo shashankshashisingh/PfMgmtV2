@@ -97,7 +97,7 @@ if (!fs.existsSync(dayFile) || !result.cached) {
   fs.writeFileSync(dayFile, JSON.stringify({
     date: result.date, savedAt: stamp, source: "NSE CM Bhavcopy",
     rowCount: allRows.length, rows: allRows,
-  }) + "\\n");
+  }) + "\n");
 }
 const indexFile = "data/bhavcopy-index.json";
 const archiveIndex = readJson(indexFile, { dates: [] });
@@ -107,7 +107,7 @@ const sortedArchiveDates = [...archiveDates].sort();
 fs.writeFileSync(indexFile, JSON.stringify({
   updated: stamp, latestDate: sortedArchiveDates.at(-1) || result.date,
   count: sortedArchiveDates.length, dates: sortedArchiveDates,
-}) + "\\n");
+}) + "\n");
 
 const merged = mergeBhavcopyHistory(oldHistory, allRows);
 merged.meta = { ...(merged.meta || {}) };
