@@ -37,7 +37,8 @@ export function normalizeBhavcopyRows(rows, fallbackDate) {
     if (!symbol || !["EQ", "BE"].includes(series) || !Number.isFinite(close) || close <= 0) continue;
     const date = normalizeDate(rawDate);
     if (!date) continue;
-    out.push({ date, symbol, series, close, previousClose: Number.isFinite(previousClose) ? previousClose : null });
+    const name = String(pick(row, "FinInstrmNm", "NAME OF COMPANY", "Company Name", "COMPANY NAME", "Security Name") || symbol).trim();
+    out.push({ date, symbol, series, close, previousClose: Number.isFinite(previousClose) ? previousClose : null, name });
   }
   return out;
 }
