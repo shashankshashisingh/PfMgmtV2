@@ -132,6 +132,7 @@ section[hidden]{display:none!important}
 
   <nav class="tabs" id="tabs" role="tablist" aria-label="Sections">
     <button role="tab" data-tab="today" aria-selected="true">Today</button>
+    <button role="tab" data-tab="funds" aria-selected="false">Funds</button>
     <button role="tab" data-tab="holdings" aria-selected="false">Holdings</button>
     <button role="tab" data-tab="stats" aria-selected="false">Statistics</button>
     <button role="tab" data-tab="bench" aria-selected="false">vs Benchmark</button>
@@ -140,6 +141,7 @@ section[hidden]{display:none!important}
   </nav>
 
   <div id="banner"></div>
+  <div class="periodbar" id="fundbar"></div>
   <div class="periodbar" id="periodbar"></div>
 
   <!-- TODAY -->
@@ -156,6 +158,26 @@ section[hidden]{display:none!important}
     </div>
   </section>
 
+  <!-- FUNDS -->
+  <section id="tab-funds" class="stack" hidden>
+    <div class="panel">
+      <h2>Fund comparison <span class="hint" id="fundHint"></span></h2>
+      <div id="fundAlloc"></div>
+      <div class="tw" id="fundTable"></div>
+      <p class="note">Each fund is measured against its own benchmark. Return is time-weighted over the selected period, so money added to one fund does not flatter it. Click a fund name to open it.</p>
+    </div>
+    <div class="panel">
+      <h2>Manage funds</h2>
+      <div id="fundMgmt"></div>
+      <form class="f" id="fundForm" autocomplete="off" style="margin-top:14px">
+        <label class="fl" style="grid-column:span 2">New fund name<input id="nfName" placeholder="Small Cap" required></label>
+        <label class="fl" style="grid-column:span 2">Benchmark<select id="nfBench"></select></label>
+        <button class="btn" type="submit">Create fund</button>
+      </form>
+      <div class="msg" id="fundMsg"></div>
+    </div>
+  </section>
+
   <!-- HOLDINGS -->
   <section id="tab-holdings" class="stack" hidden>
     <div class="panel">
@@ -167,6 +189,7 @@ section[hidden]{display:none!important}
       <summary>Add a transaction</summary>
       <div class="in">
         <form class="f" id="txnForm" autocomplete="off">
+          <label class="fl">Fund<select id="fFund"></select></label>
           <label class="fl">Date<input type="date" id="fDate" required></label>
           <label class="fl">Side<select id="fType"><option value="BUY">Buy</option><option value="SELL">Sell</option></select></label>
           <label class="fl">Symbol<input id="fSym" list="symList" placeholder="RELIANCE" required><datalist id="symList"></datalist></label>
@@ -235,7 +258,7 @@ section[hidden]{display:none!important}
   <!-- REBALANCE -->
   <section id="tab-rebalance" class="stack" hidden>
     <div class="panel">
-      <h2>Target allocation <span class="hint">edit targets, then read the trade needed</span></h2>
+      <h2>Target allocation <span class="hint" id="rebFor">edit targets, then read the trade needed</span></h2>
       <div class="tw" id="rebTable"></div>
       <div class="msg" id="rebMsg"></div>
     </div>
@@ -250,8 +273,8 @@ section[hidden]{display:none!important}
       <div class="cols">
         <div>
           <b>Transactions</b>
-          <pre class="code">date,symbol,type,qty,price,class,name
-2026-01-12,TCS,BUY,10,3950,Equity,Tata Consultancy</pre>
+          <pre class="code">date,symbol,type,qty,price,class,name,fund
+2026-01-12,TCS,BUY,10,3950,Equity,Tata Consultancy,Large Cap</pre>
         </div>
         <div>
           <b>Price history</b>
@@ -260,7 +283,7 @@ section[hidden]{display:none!important}
 2026-01-12,NIFTY50,24890.1</pre>
         </div>
       </div>
-      <p class="note">Dates may be YYYY-MM-DD, DD-MM-YYYY or DD/MM/YYYY. Add class "Index" to price rows to mark a benchmark. Mutual fund NAVs and FD values go in as price history too.</p>
+      <p class="note">Dates may be YYYY-MM-DD, DD-MM-YYYY or DD/MM/YYYY. The optional fund column puts a transaction in that fund and creates the fund if it is new. Add class "Index" to price rows to mark a benchmark. Mutual fund NAVs and FD values go in as price history too.</p>
       <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
         <textarea id="csvIn" placeholder="Paste CSV here"></textarea>
         <div class="cols" style="align-items:center">
@@ -429,6 +452,7 @@ const DEMO_SYMS=[
   {s:'NIFTY50',n:'Nifty 50',c:'Index',p0:22800,b:1,idio:0,dr:.12},
   {s:'SENSEX',n:'Sensex',c:'Index',p0:75100,b:1,idio:.0006,dr:.12},
   {s:'NIFTYMID150',n:'Nifty Midcap 150',c:'Index',p0:19900,b:1.15,idio:.0042,dr:.15},
+  {s:'NIFTYSMALL250',n:'Nifty Smallcap 250',c:'Index',p0:14800,b:1.3,idio:.004,dr:.17},
   {s:'RELIANCE',n:'Reliance Industries',c:'Equity',p0:1250,b:1,idio:.011,dr:.08},
   {s:'HDFCBANK',n:'HDFC Bank',c:'Equity',p0:1620,b:.95,idio:.0095,dr:.1},
   {s:'TCS',n:'Tata Consultancy Services',c:'Equity',p0:3900,b:.65,idio:.011,dr:.06},
@@ -437,6 +461,8 @@ const DEMO_SYMS=[
   {s:'NIFTYBEES',n:'Nifty 50 ETF',c:'ETF',p0:245,b:1,idio:.0006,dr:.12},
   {s:'GOLDBEES',n:'Gold ETF',c:'Gold',p0:62,b:.04,idio:.0075,dr:.14},
   {s:'FLEXICAP',n:'Example Flexi Cap Fund',c:'Mutual Fund',p0:78,b:.85,idio:.0042,dr:.13},
+  {s:'MIDCAPFUND',n:'Example Midcap Fund',c:'Mutual Fund',p0:95,b:1.12,idio:.0045,dr:.16},
+  {s:'SMALLCAPFUND',n:'Example Smallcap Fund',c:'Mutual Fund',p0:140,b:1.25,idio:.006,dr:.17},
   {s:'DEBTFUND',n:'Example Short Duration Fund',c:'Debt',p0:1050,b:0,idio:.0004,dr:.068},
   {s:'BANKFD',n:'Bank fixed deposit',c:'Fixed Deposit',p0:1000,b:0,idio:0,dr:.071,fixed:true}
 ];
@@ -462,23 +488,36 @@ function buildDemo(){
   }
   const at=(s,i)=>series[s].c[i];
   const txns=[];let id=1;
-  const add=(s,i,q,type)=>txns.push({id:id++,date:dates[i],symbol:s,type:type||'BUY',qty:q,price:at(s,i)});
-  add('RELIANCE',22,40);add('HDFCBANK',22,30);add('TCS',24,12);add('ICICIBANK',30,45);
-  add('ITC',30,120);add('NIFTYBEES',34,300);add('GOLDBEES',36,900);add('DEBTFUND',40,35);
-  add('BANKFD',40,150);add('TCS',140,8);add('RELIANCE',210,25);add('ICICIBANK',250,30);
-  add('ITC',300,50,'SELL');add('NIFTYBEES',330,200);add('GOLDBEES',360,400);add('HDFCBANK',372,20);
-  for(let k=0;k<11;k++)add('FLEXICAP',44+k*32,260);
+  const add=(s,i,q,type,fund)=>txns.push({id:id++,date:dates[i],symbol:s,type:type||'BUY',qty:q,price:at(s,i),fund});
+  const L='f1',M='f2',Sm='f3',D='f4';
+  add('RELIANCE',22,40,'BUY',L);add('HDFCBANK',22,30,'BUY',L);add('TCS',24,12,'BUY',L);add('ICICIBANK',30,45,'BUY',L);
+  add('ITC',30,120,'BUY',L);add('NIFTYBEES',34,300,'BUY',L);add('GOLDBEES',36,900,'BUY',D);add('DEBTFUND',40,35,'BUY',D);
+  add('BANKFD',40,150,'BUY',D);add('TCS',140,8,'BUY',L);add('RELIANCE',210,25,'BUY',L);add('ICICIBANK',250,30,'BUY',L);
+  add('ITC',300,50,'SELL',L);add('NIFTYBEES',330,200,'BUY',L);add('GOLDBEES',360,400,'BUY',D);add('HDFCBANK',372,20,'BUY',L);
+  for(let k=0;k<11;k++)add('FLEXICAP',44+k*32,260,'BUY',M);
+  add('MIDCAPFUND',50,1500,'BUY',M);add('MIDCAPFUND',200,1200,'BUY',M);
+  add('SMALLCAPFUND',60,900,'BUY',Sm);add('SMALLCAPFUND',180,700,'BUY',Sm);add('SMALLCAPFUND',320,600,'BUY',Sm);
   return {series,meta,txns,beta,idio};
 }
 
 /* ---------- state ---------- */
 let S=null,DEMO_AUX=null;
 const FEED={meta:{},updated:''};
-function blank(){return {mode:'user',txns:[],meta:{},series:{},manual:{},live:{},bench:'',rf:7,targets:{},feedUrl:'',period:'1Y',sort:{k:'value',dir:-1},nextId:1}}
+function blank(){return {mode:'user',ver:2,txns:[],meta:{},series:{},manual:{},live:{},bench:'',rf:7,targets:{},feedUrl:'',period:'1Y',sort:{k:'value',dir:-1},nextId:1,funds:[{id:'f1',name:'Main',bench:''}],view:'ALL'}}
 function demoState(){
   const d=buildDemo();DEMO_AUX={beta:d.beta,idio:d.idio};
-  return {mode:'demo',txns:d.txns,meta:d.meta,series:d.series,manual:{},live:{},bench:'NIFTY50',rf:7,targets:Object.assign({},DEMO_TARGETS),feedUrl:'',period:'1Y',sort:{k:'value',dir:-1},nextId:d.txns.length+1};
+  return {mode:'demo',ver:2,txns:d.txns,meta:d.meta,series:d.series,manual:{},live:{},bench:'NIFTY50',rf:7,targets:{ALL:Object.assign({},DEMO_TARGETS)},feedUrl:'',period:'1Y',sort:{k:'value',dir:-1},nextId:d.txns.length+1,
+    funds:[{id:'f1',name:'Large Cap',bench:'NIFTY50'},{id:'f2',name:'Mid Cap',bench:'NIFTYMID150'},{id:'f3',name:'Small Cap',bench:'NIFTYSMALL250'},{id:'f4',name:'Defensive',bench:''}],view:'ALL'};
 }
+function normalize(){
+  if(!Array.isArray(S.funds)||!S.funds.length)S.funds=[{id:'f1',name:'Main',bench:''}];
+  for(const t of S.txns)if(!t.fund||!S.funds.some(f=>f.id===t.fund))t.fund=S.funds[0].id;
+  const tk=Object.keys(S.targets||{});
+  if(tk.length&&typeof S.targets[tk[0]]==='number')S.targets={ALL:S.targets};
+  if(!S.targets)S.targets={};
+  if(!S.view||(S.view!=='ALL'&&!S.funds.some(f=>f.id===S.view)))S.view='ALL';
+}
+function newFundId(){return 'f'+(Math.max(0,...S.funds.map(f=>parseInt(f.id.slice(1))||0))+1)}
 function save(){
   if(S.mode!=='user')return;
   try{const o=Object.assign({},S);delete o.live;localStorage.setItem(LS,JSON.stringify(o))}catch(e){}
@@ -486,7 +525,7 @@ function save(){
 function load(){
   try{
     const raw=localStorage.getItem(LS);
-    if(raw){const o=JSON.parse(raw);if(o&&o.mode==='user'&&Array.isArray(o.txns)){S=Object.assign(blank(),o);S.live={};return}}
+    if(raw){const o=JSON.parse(raw);if(o&&o.mode==='user'&&Array.isArray(o.txns)){S=Object.assign(blank(),o);S.live={};normalize();return}}
   }catch(e){}
   S=demoState();
 }
@@ -521,6 +560,26 @@ function simTick(){
 
 /* ---------- compute ---------- */
 let C=null;
+function viewTxns(){return S.view==='ALL'?S.txns:S.txns.filter(t=>t.fund===S.view)}
+function analyze(txns,px,dates,n){
+  const book=processTxns(txns);
+  const pos=[];
+  for(const s in book){
+    const lots=book[s].lots;const qty=sum(lots.map(l=>l.qty));
+    if(qty<=1e-9&&Math.abs(book[s].realised)<1e-9)continue;
+    const p=px[s];
+    const ltp=p?p[n-1]:NaN,prev=p&&n>1?p[n-2]:ltp;
+    const cost=sum(lots.map(l=>l.qty*l.price));
+    const value=qty*ltp;
+    pos.push({s,name:(S.meta[s]&&S.meta[s].name)||s,cls:(S.meta[s]&&S.meta[s].cls)||'Other',sector:(S.meta[s]&&S.meta[s].sector)||'',qty,cost,avg:qty?cost/qty:0,ltp,prev,
+      dayPct:prev?ltp/prev-1:0,dayPnl:qty*(ltp-prev),value,unreal:value-cost,unrealPct:cost?value/cost-1:NaN,realised:book[s].realised,lots});
+  }
+  const held=pos.filter(p=>p.qty>1e-9);
+  const total=sum(held.map(p=>p.value));
+  for(const p of pos)p.w=total&&p.qty>1e-9?p.value/total:0;
+  const ps=portfolioSeries(txns,dates,px);
+  return {book,pos,held,total,ps,txns};
+}
 function compute(){
   const ist=istNow();
   const L=Object.assign({},S.live,S.manual);
@@ -537,40 +596,25 @@ function compute(){
     for(let i=0;i<arr.length&&arr[i]==null;i++)arr[i]=c[0];
     px[s]=arr;
   }
-  if(!dates.length){C={dates,px,n:0,book:processTxns(S.txns),pos:[],ps:null,ist};return}
+  if(!dates.length){C={dates,px,n:0,book:{},pos:[],held:[],total:0,ps:{value:[],flow:[],invested:[],ret:[],idx:[],start:-1},txns:[],ist};return}
   const lastHist=dates[dates.length-1];
   const manualOn=Object.keys(S.manual).length>0;
   const liveOn=hasLive&&ist.date>lastHist&&((ist.trading&&ist.started)||manualOn);
   if(liveOn){dates.push(ist.date);for(const s in px)px[s].push(L[s]!=null?L[s]:px[s][px[s].length-1])}
   else if(hasLive&&ist.date===lastHist){for(const s in px)if(L[s]!=null)px[s][px[s].length-1]=L[s]}
   const n=dates.length;
-  const book=processTxns(S.txns);
-  const pos=[];
-  for(const s in book){
-    const lots=book[s].lots;const qty=sum(lots.map(l=>l.qty));
-    if(qty<=1e-9&&Math.abs(book[s].realised)<1e-9)continue;
-    const p=px[s];
-    const ltp=p?p[n-1]:NaN,prev=p&&n>1?p[n-2]:ltp;
-    const cost=sum(lots.map(l=>l.qty*l.price));
-    const value=qty*ltp;
-    pos.push({s,name:(S.meta[s]&&S.meta[s].name)||s,cls:(S.meta[s]&&S.meta[s].cls)||'Other',sector:(S.meta[s]&&S.meta[s].sector)||'',qty,cost,avg:qty?cost/qty:0,ltp,prev,
-      dayPct:prev?ltp/prev-1:0,dayPnl:qty*(ltp-prev),value,unreal:value-cost,unrealPct:cost?value/cost-1:NaN,realised:book[s].realised,lots});
-  }
-  const held=pos.filter(p=>p.qty>1e-9);
-  const total=sum(held.map(p=>p.value));
-  for(const p of pos)p.w=total&&p.qty>1e-9?p.value/total:0;
-  const ps=portfolioSeries(S.txns,dates,px);
-  C={dates,px,n,book,pos,held,total,ps,ist,liveOn};
+  C=Object.assign({dates,px,n,ist,liveOn},analyze(viewTxns(),px,dates,n));
 }
-function totals(){
-  const h=C.held||[];
+function totals(A){
+  A=A||C;
+  const h=A.held||[];
   const value=sum(h.map(p=>p.value)),cost=sum(h.map(p=>p.cost));
-  const dayPnl=sum(h.map(p=>p.dayPnl)),realised=sum(C.pos.map(p=>p.realised));
-  const flows=sortTxns(S.txns).map(t=>({t:Date.parse(t.date+'T00:00:00Z'),amt:(t.type==='BUY'?-1:1)*t.qty*t.price}));
+  const dayPnl=sum(h.map(p=>p.dayPnl)),realised=sum(A.pos.map(p=>p.realised));
+  const flows=sortTxns(A.txns).map(t=>({t:Date.parse(t.date+'T00:00:00Z'),amt:(t.type==='BUY'?-1:1)*t.qty*t.price}));
   let x=NaN;
-  if(flows.length&&value>0){const end=Date.parse(C.dates[C.n-1]+'T00:00:00Z');flows.push({t:Math.max(end,flows[flows.length-1].t+86400000),amt:value});x=xirr(flows)}
+  if(flows.length&&value>0&&C.n){const end=Date.parse(C.dates[C.n-1]+'T00:00:00Z');flows.push({t:Math.max(end,flows[flows.length-1].t+86400000),amt:value});x=xirr(flows)}
   const lt={st:0,lt:0};
-  const today=Date.parse(C.dates[C.n-1]+'T00:00:00Z');
+  const today=C.n?Date.parse(C.dates[C.n-1]+'T00:00:00Z'):0;
   for(const p of h)for(const l of p.lots){const age=(today-Date.parse(l.date+'T00:00:00Z'))/86400000;const g=l.qty*(p.ltp-l.price);if(age>365)lt.lt+=g;else lt.st+=g}
   return {value,cost,unreal:value-cost,realised,dayPnl,dayPct:value-dayPnl>0?dayPnl/(value-dayPnl):0,xirr:x,term:lt};
 }
@@ -583,11 +627,14 @@ function benchCandidates(){
   }
   return out;
 }
-function benchSym(){
+function benchFor(viewId){
+  const f=S.funds.find(x=>x.id===viewId);
+  const pick=(f&&f.bench)||S.bench;
+  if(pick&&C.px[pick])return pick;
   const c=benchCandidates();
-  if(S.bench&&C.px[S.bench])return S.bench;
   return c[0]||'';
 }
+function benchSym(){return benchFor(S.view)}
 
 /* ---------- charts ---------- */
 function niceTicks(lo,hi,k){
@@ -644,10 +691,11 @@ function lineChart(host,dates,series,o){
 /* ---------- rendering ---------- */
 let activeTab='today';
 const slice=(a,from)=>a.slice(from);
-function range(){
+function rangeFor(A){
   const from0=periodStart(C.dates,S.period==='All'?'ALL':S.period);
-  return Math.max(from0,C.ps.start>=0?C.ps.start:0);
+  return Math.max(from0,A.ps.start>=0?A.ps.start:0);
 }
+function range(){return rangeFor(C)}
 function renderStatus(){
   const ist=C.ist||istNow();
   const state=ist.open?'Market open':ist.preopen?'Pre-open':'Market closed';
@@ -716,22 +764,75 @@ function renderHoldings(){
 function renderTxns(){
   const t=sortTxns(S.txns).reverse();
   if(!t.length){$('#txnTable').innerHTML='<div class="empty">No transactions recorded.</div>';return}
-  $('#txnTable').innerHTML='<table><thead><tr><th>Date</th><th>Side</th><th>Symbol</th><th class="n">Qty</th><th class="n">Price</th><th class="n">Amount</th><th></th></tr></thead><tbody>'+
-    t.map(x=>'<tr><td>'+esc(fmtD(x.date))+'</td><td class="'+(x.type==='BUY'?'':'loss')+'">'+(x.type==='BUY'?'Buy':'Sell')+'</td><td>'+esc(x.symbol)+'</td><td class="n">'+nm(x.qty,x.qty%1?3:0)+'</td><td class="n">'+inr(x.price,2)+'</td><td class="n">'+inr(x.qty*x.price)+'</td><td><button class="btn ghost sm" data-del="'+x.id+'" aria-label="Delete transaction">Delete</button></td></tr>').join('')+'</tbody></table>';
+  $('#txnTable').innerHTML='<table><thead><tr><th>Date</th><th>Fund</th><th>Side</th><th>Symbol</th><th class="n">Qty</th><th class="n">Price</th><th class="n">Amount</th><th></th></tr></thead><tbody>'+
+    t.map(x=>'<tr><td>'+esc(fmtD(x.date))+'</td><td>'+esc(fundName(x.fund))+'</td><td class="'+(x.type==='BUY'?'':'loss')+'">'+(x.type==='BUY'?'Buy':'Sell')+'</td><td>'+esc(x.symbol)+'</td><td class="n">'+nm(x.qty,x.qty%1?3:0)+'</td><td class="n">'+inr(x.price,2)+'</td><td class="n">'+inr(x.qty*x.price)+'</td><td><button class="btn ghost sm" data-del="'+x.id+'" aria-label="Delete transaction">Delete</button></td></tr>').join('')+'</tbody></table>';
 }
 function fillSymbolLists(){
   const syms=Object.keys(S.series).filter(s=>(S.meta[s]||{}).cls!=='Index').sort();
   $('#symList').innerHTML=syms.map(s=>'<option value="'+esc(s)+'">'+esc((S.meta[s]||{}).name||'')+'</option>').join('');
-  const held=(C.held||[]).map(p=>p.s).sort();
+  const bk=processTxns(S.txns);
+  const held=Object.keys(bk).filter(s=>sum(bk[s].lots.map(l=>l.qty))>1e-9).sort();
   $('#pSym').innerHTML=held.map(s=>'<option>'+esc(s)+'</option>').join('');
+  const cur=$('#fFund').value;
+  $('#fFund').innerHTML=S.funds.map(f=>'<option value="'+esc(f.id)+'">'+esc(f.name)+'</option>').join('');
+  $('#fFund').value=S.funds.some(f=>f.id===cur)?cur:(S.view!=='ALL'?S.view:S.funds[0].id);
 }
-function periodData(){
-  const from=range(),ps=C.ps,b=benchSym();
+function fundName(id){const f=S.funds.find(x=>x.id===id);return f?f.name:'—'}
+function renderFundbar(){
+  const el=$('#fundbar');
+  const show=!['data','funds'].includes(activeTab)&&S.funds.length>1;
+  el.hidden=!show;
+  el.innerHTML='<span class="lbl">Fund</span><button class="chip" data-view="ALL" aria-pressed="'+(S.view==='ALL')+'">All funds</button>'+
+    S.funds.map(f=>'<button class="chip" data-view="'+esc(f.id)+'" aria-pressed="'+(S.view===f.id)+'">'+esc(f.name)+'</button>').join('');
+}
+function fundRows(){
+  const rf=S.rf/100;
+  const mk=(f,tx,b)=>{
+    const A=analyze(tx,C.px,C.dates,C.n),T=totals(A),D=periodDataFor(A,b);
+    return {f,A,T,b,count:tx.length,st:perfStats(D.pr,rf),rel:D.br?relStats(D.pr,D.br,rf):{},sb:D.br?perfStats(D.br,rf):{}};
+  };
+  const rows=S.funds.map(f=>mk(f,S.txns.filter(t=>t.fund===f.id),benchFor(f.id)));
+  const all=mk({id:'ALL',name:'All funds'},S.txns,benchFor('ALL'));
+  return {rows,all};
+}
+function renderFunds(){
+  if(!C.n){$('#fundTable').innerHTML=emptyMsg();$('#fundAlloc').innerHTML='';return}
+  const {rows,all}=fundRows();
+  $('#fundHint').textContent='period: '+S.period;
+  const tot=all.T.value;
+  $('#fundAlloc').innerHTML=tot>0?'<div class="alloc">'+rows.map((r,i)=>'<span style="width:'+(r.T.value/tot*100).toFixed(2)+'%;background:var(--c'+(i%7+1)+')" title="'+esc(r.f.name)+'"></span>').join('')+'</div>':'';
+  const cell=(r,i)=>{
+    const has=r.T.value>0||r.count>0,T=r.T,st=r.st,ex=has&&isFinite(st.total)&&isFinite(r.sb.total)?st.total-r.sb.total:NaN;
+    const nameCell=i>=0?'<span class="swatch" style="background:var(--c'+(i%7+1)+')"></span><button class="chip" data-fundsel="'+esc(r.f.id)+'">'+esc(r.f.name)+'</button>':'<b>All funds</b>';
+    return '<tr'+(i<0?' style="font-weight:600"':'')+'><td>'+nameCell+'</td><td>'+esc(r.b||'—')+'</td>'+
+      '<td class="n">'+(has?inrC(T.value):'—')+'</td><td class="n">'+(tot>0&&has?pc(T.value/tot,1):'—')+'</td>'+
+      '<td class="n '+sg(T.dayPnl)+'">'+(has?pcS(T.dayPct):'—')+'</td>'+
+      '<td class="n '+sg(st.total)+'">'+pcS(st.total)+'</td><td class="n '+sg(ex)+'">'+pcS(ex)+'</td>'+
+      '<td class="n '+sg(T.xirr)+'">'+pcS(T.xirr,1)+'</td><td class="n">'+pc(st.vol)+'</td><td class="n">'+nm(st.sharpe)+'</td>'+
+      '<td class="n loss">'+(isFinite(st.mdd)?pc(st.mdd):'—')+'</td><td class="n">'+nm(r.rel.beta)+'</td><td class="n '+sg(r.rel.alpha)+'">'+pcS(r.rel.alpha)+'</td></tr>';
+  };
+  $('#fundTable').innerHTML='<table><thead><tr><th>Fund</th><th>Benchmark</th><th class="n">Value</th><th class="n">Share</th><th class="n">Today</th><th class="n">Return</th><th class="n">vs bench</th><th class="n">XIRR</th><th class="n">Volatility</th><th class="n">Sharpe</th><th class="n">Max drawdown</th><th class="n">Beta</th><th class="n">Alpha</th></tr></thead><tbody>'+
+    rows.map((r,i)=>cell(r,i)).join('')+cell(all,-1)+'</tbody></table>';
+  // management
+  const cands=benchCandidates();
+  const opt=sel=>'<option value="">Default ('+esc(S.bench||'none')+')</option>'+cands.map(c=>'<option value="'+esc(c)+'"'+(c===sel?' selected':'')+'>'+esc(((S.meta[c]||{}).name||c))+'</option>').join('');
+  $('#fundMgmt').innerHTML=S.funds.map(f=>{
+    const n=S.txns.filter(t=>t.fund===f.id).length;
+    return '<div class="cols" style="align-items:center;margin-bottom:8px"><input data-fname="'+esc(f.id)+'" value="'+esc(f.name)+'" aria-label="Fund name" style="flex:2 1 160px">'+
+      '<select data-fbench="'+esc(f.id)+'" aria-label="Benchmark for '+esc(f.name)+'" style="flex:2 1 160px">'+opt(f.bench)+'</select>'+
+      '<span class="muted" style="flex:0 0 90px">'+n+' trades</span>'+
+      '<button class="btn ghost sm" data-fdel="'+esc(f.id)+'" style="flex:0 0 auto">Delete</button></div>';
+  }).join('');
+  $('#nfBench').innerHTML=opt('');
+}
+function periodDataFor(A,b){
+  const from=rangeFor(A),ps=A.ps;
   const pr=[],br=[];
   const bp=b?C.px[b]:null;
   for(let i=from+1;i<C.n;i++){if(ps.ret[i]!=null&&bp){pr.push(ps.ret[i]);br.push(bp[i]/bp[i-1]-1)}else if(ps.ret[i]!=null){pr.push(ps.ret[i])}}
   return {from,pr,br:bp?br:null,b,bp};
 }
+function periodData(){return periodDataFor(C,benchSym())}
 function renderStats(){
   const T=totals();
   if(!C.held.length||C.ps.start<0){$('#statGrid').innerHTML='<div class="panel" style="grid-column:1/-1">'+emptyMsg()+'</div>';$('#ddChart').innerHTML='';$('#contrib').innerHTML='';return}
@@ -816,13 +917,14 @@ function renderBench(){
 function renderRebalance(){
   const T=totals();
   if(!C.held.length){$('#rebTable').innerHTML=emptyMsg();$('#concBox').innerHTML='';return}
+  const TG=S.targets[S.view]||{};
   const by={};for(const p of C.held)by[p.cls]=(by[p.cls]||0)+p.value;
-  const classes=[...new Set([...CLASSES.filter(c=>by[c]!=null||S.targets[c]!=null)])];
-  const tsum=sum(classes.map(c=>+S.targets[c]||0));
+  const classes=[...new Set([...CLASSES.filter(c=>by[c]!=null||TG[c]!=null)])];
+  const tsum=sum(classes.map(c=>+TG[c]||0));
   $('#rebTable').innerHTML='<table><thead><tr><th>Asset class</th><th class="n">Value</th><th class="n">Current</th><th class="n">Target %</th><th class="n">Drift</th><th class="n">Trade to reach target</th></tr></thead><tbody>'+
-    classes.map(c=>{const cur=(by[c]||0)/T.value,tg=(+S.targets[c]||0)/100,drift=cur-tg,trade=(tg-cur)*T.value;
+    classes.map(c=>{const cur=(by[c]||0)/T.value,tg=(+TG[c]||0)/100,drift=cur-tg,trade=(tg-cur)*T.value;
     return '<tr><td><span class="swatch" style="background:'+clsColor(c)+'"></span>'+esc(c)+'</td><td class="n">'+inrC(by[c]||0)+'</td><td class="n">'+pc(cur,1)+'</td>'+
-    '<td class="n"><input type="number" data-target="'+esc(c)+'" value="'+(S.targets[c]!=null?S.targets[c]:'')+'" step="0.5" min="0" max="100" style="width:80px;text-align:right" aria-label="Target percent for '+esc(c)+'"></td>'+
+    '<td class="n"><input type="number" data-target="'+esc(c)+'" value="'+(TG[c]!=null?TG[c]:'')+'" step="0.5" min="0" max="100" style="width:80px;text-align:right" aria-label="Target percent for '+esc(c)+'"></td>'+
     '<td class="n '+(Math.abs(drift)>.05?'loss':'')+'">'+(drift>0?'+':drift<0?'−':'')+Math.abs(drift*100).toFixed(1)+' pp</td>'+
     '<td class="n '+(trade>0?'gain':trade<0?'loss':'')+'">'+(Math.abs(trade)<500?'on target':(trade>0?'Buy ':'Sell ')+inrC(Math.abs(trade)))+'</td></tr>'}).join('')+'</tbody></table>';
   $('#rebMsg').className='msg '+(Math.abs(tsum-100)<.01?'ok':'err');
@@ -835,12 +937,13 @@ function renderData(){
 }
 function renderAll(){
   compute();
-  renderStatus();renderBanner();renderPeriod();fillSymbolLists();
+  renderStatus();renderBanner();renderFundbar();renderPeriod();fillSymbolLists();
   renderTabContent();
 }
 function renderTabContent(){
   if(activeTab==='today')renderToday();
   else if(activeTab==='holdings'){renderHoldings();renderTxns()}
+  else if(activeTab==='funds')renderFunds();
   else if(activeTab==='stats')renderStats();
   else if(activeTab==='bench')renderBench();
   else if(activeTab==='rebalance')renderRebalance();
@@ -851,7 +954,7 @@ function setTab(t){
   document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===t)));
   document.querySelectorAll('main,section[id^="tab-"]').forEach(s=>{if(s.id)s.hidden=s.id!=='tab-'+t});
   try{history.replaceState(null,'','#'+t)}catch(e){}
-  renderPeriod();renderTabContent();
+  renderFundbar();renderPeriod();renderTabContent();
 }
 
 /* ---------- CSV ---------- */
@@ -883,13 +986,20 @@ function importCSV(text){
   if(rows.length<2)return {err:'Nothing to import. Include a header row and at least one data row.'};
   const hdr=rows[0].map(x=>x.trim().toLowerCase());
   const ix=(...names)=>{for(const n of names){const i=hdr.indexOf(n);if(i>=0)return i}return -1};
-  const iDate=ix('date'),iSym=ix('symbol','ticker','scrip'),iQty=ix('qty','quantity','units'),iType=ix('type','side'),iPrice=ix('price','rate'),iClose=ix('close','nav','value'),iCls=ix('class','asset class','assetclass'),iName=ix('name','instrument');
+  const iDate=ix('date'),iSym=ix('symbol','ticker','scrip'),iQty=ix('qty','quantity','units'),iType=ix('type','side'),iPrice=ix('price','rate'),iClose=ix('close','nav','value'),iCls=ix('class','asset class','assetclass'),iName=ix('name','instrument'),iFund=ix('fund','portfolio','strategy');
   if(iDate<0||iSym<0)return {err:'The header needs at least "date" and "symbol" columns.'};
   const isTx=iQty>=0&&iPrice>=0;
   const isPx=!isTx&&(iClose>=0||iPrice>=0);
   if(!isTx&&!isPx)return {err:'Could not tell what this is. Transactions need qty and price. Price history needs close.'};
   ensureUser();
   let ok=0,bad=0;const warns=[];
+  const defFund=()=>S.view!=='ALL'&&S.funds.some(f=>f.id===S.view)?S.view:S.funds[0].id;
+  const fundOf=nm=>{
+    nm=String(nm||'').trim();if(!nm)return defFund();
+    let f=S.funds.find(x=>x.name.toLowerCase()===nm.toLowerCase());
+    if(!f){f={id:newFundId(),name:nm,bench:''};S.funds.push(f)}
+    return f.id;
+  };
   if(isTx){
     const seen=new Set();
     for(let r=1;r<rows.length;r++){
@@ -897,7 +1007,7 @@ function importCSV(text){
       const ty=iType>=0?String(x[iType]).trim().toUpperCase():'BUY';
       const type=ty.startsWith('S')?'SELL':'BUY';
       if(!date||!sym||!(qty>0)||!(price>=0)){bad++;continue}
-      S.txns.push({id:S.nextId++,date,symbol:sym,type,qty,price});ok++;
+      S.txns.push({id:S.nextId++,date,symbol:sym,type,qty,price,fund:fundOf(iFund>=0?x[iFund]:'')});ok++;
       const cl=iCls>=0?String(x[iCls]).trim():'';
       const cls=CLASSES.find(c=>c.toLowerCase()===cl.toLowerCase())||(cl.toLowerCase()==='index'?'Index':null);
       const old=S.meta[sym]||{};
@@ -968,15 +1078,26 @@ document.addEventListener('click',e=>{
   if(t.dataset.tab){setTab(t.dataset.tab);return}
   if(t.dataset.per){S.period=t.dataset.per;save();renderAll();return}
   if(t.dataset.sort){const k=t.dataset.sort;S.sort=S.sort.k===k?{k,dir:-S.sort.dir}:{k,dir:k==='name'?1:-1};save();renderHoldings();return}
+  if(t.dataset.view){S.view=t.dataset.view;save();renderAll();if(S.view!=='ALL')$('#fFund').value=S.view;return}
+  if(t.dataset.fundsel){S.view=t.dataset.fundsel;save();compute();setTab('today');return}
+  if(t.dataset.fdel){
+    const id=t.dataset.fdel,M=$('#fundMsg');
+    if(S.mode==='demo'){msg(M,'This is the example portfolio. Import your holdings or start empty before changing funds.','err');return}
+    if(S.txns.some(x=>x.fund===id)){msg(M,'This fund still has transactions. Delete them on the Holdings tab first.','err');return}
+    if(S.funds.length<2){msg(M,'Keep at least one fund.','err');return}
+    S.funds=S.funds.filter(f=>f.id!==id);if(S.view===id)S.view='ALL';delete S.targets[id];save();renderAll();return
+  }
   if(t.dataset.del){S.txns=S.txns.filter(x=>String(x.id)!==t.dataset.del);save();renderAll();return}
   if(t.id==='goData'){setTab('data');return}
   if(t.id==='startBlank'){S=blank();save();clearInterval(feedTimer);renderAll();setTab('holdings');$('#addBox').open=true;return}
 });
 document.addEventListener('change',e=>{
   const t=e.target;
-  if(t.id==='benchSel'){S.bench=t.value;save();renderBench()}
+  if(t.id==='benchSel'){const f=S.funds.find(x=>x.id===S.view);if(f)f.bench=t.value;else S.bench=t.value;save();renderBench()}
+  if(t.dataset&&t.dataset.fname!==undefined){const f=S.funds.find(x=>x.id===t.dataset.fname),v=t.value.trim();if(f&&v&&S.mode==='user'){f.name=v;save();renderAll()}else if(S.mode==='demo'){msg($('#fundMsg'),'This is the example portfolio. Import your holdings or start empty before changing funds.','err');renderFunds()}}
+  if(t.dataset&&t.dataset.fbench!==undefined){const f=S.funds.find(x=>x.id===t.dataset.fbench);if(f&&S.mode==='user'){f.bench=t.value;save();renderAll()}else if(S.mode==='demo'){msg($('#fundMsg'),'This is the example portfolio. Import your holdings or start empty before changing funds.','err');renderFunds()}}
   if(t.id==='rfIn'){const v=parseFloat(t.value);if(isFinite(v)&&v>=0){S.rf=v;save();renderBench()}}
-  if(t.dataset&&t.dataset.target!==undefined){const v=parseFloat(t.value);if(isFinite(v))S.targets[t.dataset.target]=v;else delete S.targets[t.dataset.target];save();renderRebalance()}
+  if(t.dataset&&t.dataset.target!==undefined){const v=parseFloat(t.value);const TG=S.targets[S.view]||(S.targets[S.view]={});if(isFinite(v))TG[t.dataset.target]=v;else delete TG[t.dataset.target];save();renderRebalance()}
 });
 $('#fCls').innerHTML=CLASSES.map(c=>'<option>'+c+'</option>').join('');
 $('#fSym').addEventListener('input',e=>{
@@ -1026,15 +1147,17 @@ async function tryRepoFeed(){
 }
 $('#txnForm').addEventListener('submit',e=>{
   e.preventDefault();
+  let fund=$('#fFund').value;
   const date=$('#fDate').value,type=$('#fType').value,sym=$('#fSym').value.trim().toUpperCase(),qty=parseFloat($('#fQty').value),price=parseFloat($('#fPrice').value),cur=parseFloat($('#fCur').value);
   const M=$('#txnMsg');
   if(!date||!sym||!(qty>0)||!(price>=0)){msg(M,'Enter a date, symbol, quantity and price.','err');return}
   if(S.mode==='demo'){ensureUser()}
+  if(!S.funds.some(f=>f.id===fund))fund=S.funds[0].id;
   if(type==='SELL'){
-    const b=processTxns(S.txns)[sym],held=b?sum(b.lots.map(l=>l.qty)):0;
-    if(qty>held+1e-9){msg(M,'You hold '+held+' of '+sym+', so you cannot sell '+qty+'.','err');return}
+    const b=processTxns(S.txns.filter(t=>t.fund===fund))[sym],held=b?sum(b.lots.map(l=>l.qty)):0;
+    if(qty>held+1e-9){msg(M,'The '+fundName(fund)+' fund holds '+held+' of '+sym+', so you cannot sell '+qty+'.','err');return}
   }
-  S.txns.push({id:S.nextId++,date,symbol:sym,type,qty,price});
+  S.txns.push({id:S.nextId++,date,symbol:sym,type,qty,price,fund});
   const old=S.meta[sym]||{};
   S.meta[sym]={name:$('#fName').value.trim()||old.name||sym,cls:$('#fCls').value,sector:(lookedUp[sym]&&lookedUp[sym].sector)||old.sector||''};
   if(!S.series[sym])S.series[sym]={d:[date],c:[price]};
@@ -1043,6 +1166,15 @@ $('#txnForm').addEventListener('submit',e=>{
   $('#fQty').value='';$('#fPrice').value='';$('#fCur').value='';
   msg(M,(type==='BUY'?'Bought ':'Sold ')+qty+' '+sym+'.','ok');
   renderAll();
+});
+$('#fundForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  const M=$('#fundMsg'),name=$('#nfName').value.trim();
+  if(S.mode==='demo'){msg(M,'This is the example portfolio. Import your holdings or start empty before creating funds.','err');return}
+  if(!name){msg(M,'Enter a fund name.','err');return}
+  if(S.funds.some(f=>f.name.toLowerCase()===name.toLowerCase())){msg(M,'A fund with that name exists.','err');return}
+  S.funds.push({id:newFundId(),name,bench:$('#nfBench').value});save();
+  $('#nfName').value='';msg(M,'Created '+name+'. Choose it in the transaction form to add holdings.','ok');renderAll();
 });
 $('#priceForm').addEventListener('submit',e=>{
   e.preventDefault();
@@ -1073,7 +1205,7 @@ $('#feedSave').addEventListener('click',()=>{
   msg($('#feedMsg'),'Polling…','');startFeed();pollFeed(true);
 });
 $('#copyTx').addEventListener('click',async()=>{
-  const lines=['date,symbol,type,qty,price,class,name'].concat(sortTxns(S.txns).map(t=>[t.date,t.symbol,t.type,t.qty,t.price,(S.meta[t.symbol]||{}).cls||'',JSON.stringify((S.meta[t.symbol]||{}).name||'')].join(',')));
+  const lines=['date,symbol,type,qty,price,class,name,fund'].concat(sortTxns(S.txns).map(t=>[t.date,t.symbol,t.type,t.qty,t.price,(S.meta[t.symbol]||{}).cls||'',JSON.stringify((S.meta[t.symbol]||{}).name||''),JSON.stringify(fundName(t.fund))].join(',')));
   const text=lines.join('\n');
   try{await navigator.clipboard.writeText(text);msg($('#dataMsg'),'Copied '+(lines.length-1)+' transactions.','ok')}
   catch(e){$('#csvIn').value=text;$('#csvIn').select();msg($('#dataMsg'),'Clipboard blocked. The CSV is in the import box above, ready to copy.','')}
@@ -1114,7 +1246,7 @@ $('#fDate').value=istNow().date;
 initSim();
 if(S.mode==='demo'&&!S.bench)S.bench='NIFTY50';
 let startTab='today';
-try{const h=location.hash.replace('#','');if(['today','holdings','stats','bench','rebalance','data'].includes(h))startTab=h}catch(e){}
+try{const h=location.hash.replace('#','');if(['today','funds','holdings','stats','bench','rebalance','data'].includes(h))startTab=h}catch(e){}
 compute();renderStatus();renderBanner();fillSymbolLists();
 setTab(startTab);
 startFeed();

@@ -3,6 +3,7 @@
 A single-page portfolio dashboard for Indian holdings across asset classes (equities, ETFs, mutual funds, gold, debt, fixed deposits).
 
 ## Features
+- **Funds**: create funds such as Large Cap, Mid Cap and Small Cap, each with its own benchmark, and compare them side by side. Every other tab can be switched to one fund or all funds
 - **Today**: live value, day P&L, total profit, XIRR, allocation, movers
 - **Holdings**: FIFO average cost, manual and CSV transaction entry, manual prices
 - **Statistics**: volatility, Sharpe, Sortino, max drawdown, 1-day VaR, concentration, holding-period split
@@ -15,7 +16,7 @@ Open `index.html` in a browser. No build step. Holdings are stored in the browse
 
 ## Data
 - The first load shows a simulated example portfolio.
-- Import transactions (`date,symbol,type,qty,price,class,name`) or price history (`date,symbol,close`) from the Data tab.
+- Import transactions (`date,symbol,type,qty,price,class,name,fund`; the fund column is optional and creates the fund if it is new) or price history (`date,symbol,close`) from the Data tab.
 - Live prices: a GitHub Action (`.github/workflows/update-prices.yml`) runs every 10 minutes during NSE hours, fetches quotes with [stock-nse-india](https://github.com/hi-imcodeman/stock-nse-india) for every symbol in `symbols.json`, and commits `data/prices.json`. The dashboard reads that file when it is served over HTTP (for example GitHub Pages) and polls it every 30 seconds.
 - Optional custom feed: any JSON endpoint returning `{"RELIANCE": 1432.5}`.
 - The symbol auto-fill (name, class, sector) only works inside Claude's artifact viewer.
