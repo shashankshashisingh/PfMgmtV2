@@ -1,24 +1,23 @@
-# Cloud accounts with Supabase
+# PortfolioMgmt login and cloud storage
 
-The account feature is wired to the Supabase project configured in `supabase-config.js`. It uses the existing `public.portfolios` table with a separate app key (`portfolio-mgmt`), so rows used by other apps are not overwritten.
+The account feature is configured to use the dedicated Supabase project named **PortfolioMgmt**. The browser uses only the project's public publishable key; never place a service-role key in the website.
 
-## Supabase dashboard checklist
+## Supabase setup
 
-1. Open the project configured in `supabase-config.js`.
-2. Confirm the `public.portfolios` table exists with `user_id uuid`, `app text`, `data jsonb`, `updated_at timestamptz`, and a composite primary key on `(user_id, app)`. The current connected project already has this structure.
-3. Confirm Row Level Security is enabled and policies only allow an authenticated user to select/insert/update rows where `auth.uid() = user_id`. The current project already has owner-based policies; `supabase/schema.sql` contains the hardened policy definition for a fresh setup.
-4. In **Authentication → URL Configuration**, set the Site URL to `https://shashankshashisingh.github.io/PortfolioMgmt/` and add it to the allowed redirect URLs.
-5. In **Authentication → Providers → Email**, enable email/password. If email confirmation is enabled, users must confirm their email before the first session is created.
+1. Project URL and publishable key are set in `supabase-config.js`.
+2. The `public.portfolios` table and owner-scoped row-level security policies have been created in the PortfolioMgmt Supabase project. The migration is also documented in [supabase/schema.sql](supabase/schema.sql).
+3. In the Supabase Dashboard, open **Authentication → URL Configuration**. Set the Site URL to `https://shashankshashisingh.github.io/PortfolioMgmt/` and add the same URL to the allowed redirect URLs.
+4. Under **Authentication → Providers → Email**, enable email/password. If email confirmation is enabled, users must confirm their email before their first session.
 
 ## Behaviour
 
-- Visitors can still use the example portfolio without signing in.
-- Signed-in users save holdings, transactions, funds, metadata, series and targets to their own cloud row. The app filters by both the authenticated user ID and the `portfolio-mgmt` app key.
-- On first sign-in, existing browser portfolio data is copied to the cloud if the account does not already have a saved portfolio. The browser copy is removed only after a successful migration save.
-- If a cloud portfolio already exists, it takes precedence; any old browser copy is left untouched rather than silently discarded.
-- Theme preference remains local to the browser.
-- Email/password signup, login, sign-out, and password reset are included.
+- Visitors can use the example portfolio without signing in.
+- Signed-in users save holdings, transactions, funds, metadata, series and targets to their own cloud row, keyed by their authenticated user ID and the `portfolio-mgmt` app name.
+- On first sign-in, existing browser portfolio data is copied to the cloud if the account has no saved portfolio. The local portfolio copy is removed only after a successful migration save.
+- If a cloud portfolio already exists, it takes precedence; any older browser copy is left untouched.
+- Theme preference stays local to the browser.
+- Email/password sign-up, sign-in, sign-out, and password reset are included.
 
-## Before going live
+## Verify before publishing
 
-Test signup and email confirmation, login, reload, password reset, and isolation with two separate test accounts. Cloud saving requires the Supabase project to be active and the auth redirect URLs to include the GitHub Pages URL.
+Test sign-up, email confirmation, sign-in, reload, password reset, and isolation with two test accounts. Cloud saving requires the Supabase project to be active and the authentication redirect URLs to include the GitHub Pages URL.
