@@ -64,22 +64,22 @@ if (!result) {
 const allRows = result.rows;
 const stamp = new Date().toISOString();
 const prices = {};
-const directory = { ...(previousDirectory.symbols || {}) };
+const directory = {};
 for (const row of allRows) {
   const key = row.symbol;
   prices[key] = {
     ltp: row.close,
     prevClose: row.previousClose,
     changePct: row.previousClose > 0 ? Number(((row.close / row.previousClose - 1) * 100).toFixed(4)) : null,
-    name: row.name || directory[key]?.n || key,
-    sector: directory[key]?.s || "",
+    name: row.name || previousDirectory.symbols?.[key]?.n || key,
+    sector: previousDirectory.symbols?.[key]?.s || "",
     date: row.date,
     source: "NSE Bhavcopy (end of day)",
   };
   directory[key] = {
-    n: row.name || directory[key]?.n || key,
-    c: directory[key]?.c || "Equities",
-    s: directory[key]?.s || "",
+    n: row.name || previousDirectory.symbols?.[key]?.n || key,
+    c: previousDirectory.symbols?.[key]?.c || "Equities",
+    s: previousDirectory.symbols?.[key]?.s || "",
   };
 }
 const nextArchive = {
