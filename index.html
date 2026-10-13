@@ -691,7 +691,7 @@ let S=null,DEMO_AUX=null;
 const FEED={meta:{},updated:'',dir:{},hist:null,raw:null};
 const REPO={env:'',priceCount:0,priceUpdated:'',priceErr:'',priceErrors:{},dirCount:0,dirErr:'',histCount:0,histUpdated:'',histErr:''};
 const PAGES_URL='https://shashankshashisingh.github.io/PortfolioMgmt/';
-function blank(){return {mode:'user',ver:2,txns:[],meta:{},series:{},manual:{},live:{},bench:'',rf:7,targets:{},feedUrl:'',period:'1Y',sort:{k:'value',dir:-1},nextId:1,funds:[{id:'f1',name:'Main',bench:''}],view:'ALL'}}
+function blank(){return {mode:'user',ver:2,txns:[],meta:{},series:{},manual:{},live:{},bench:'',rf:7,targets:{},feedUrl:'',period:'1Y',sort:{k:'value',dir:-1},nextId:1,funds:[{id:'f1',name:'Main',bench:'',totalAssets:0}],view:'ALL'}}
 function demoState(){
   const d=buildDemo();DEMO_AUX={beta:d.beta,idio:d.idio,fixed:d.fixed};
   return {mode:'demo',ver:2,txns:d.txns,meta:d.meta,series:d.series,manual:{},live:{},bench:'NIFTY50',rf:7,targets:{ALL:Object.assign({},DEMO_TARGETS)},feedUrl:'',period:'1Y',sort:{k:'value',dir:-1},nextId:d.txns.length+1,
@@ -703,7 +703,7 @@ function normalize(){
   if(tk0.length&&typeof S.targets[tk0[0]]==='number')S.targets={ALL:S.targets};
   for(const s in S.meta){const m=S.meta[s];if(m&&m.cls&&m.cls!=='Index'){m.cls=normClass(m.cls)||'Other'}}
   for(const v in S.targets){const t=S.targets[v];if(t&&typeof t==='object'){const o={};for(const c in t){const k=normClass(c)||c;o[k]=(o[k]||0)+t[c]}S.targets[v]=o}}
-  if(!Array.isArray(S.funds)||!S.funds.length)S.funds=[{id:'f1',name:'Main',bench:''}];
+  if(!Array.isArray(S.funds)||!S.funds.length)S.funds=[{id:'f1',name:'Main',bench:'',totalAssets:0}];\n  for(const f of S.funds){const a=Number(f.totalAssets);f.totalAssets=Number.isFinite(a)&&a>=0?a:0;}
   for(const t of S.txns)if(!t.fund||!S.funds.some(f=>f.id===t.fund))t.fund=S.funds[0].id;
   const tk=Object.keys(S.targets||{});
   if(tk.length&&typeof S.targets[tk[0]]==='number')S.targets={ALL:S.targets};
@@ -1492,7 +1492,7 @@ document.addEventListener('change',e=>{
   const t=e.target;
   if(t.id==='benchSel'){const f=S.funds.find(x=>x.id===S.view);if(f)f.bench=t.value;else S.bench=t.value;save();renderBench()}
   if(t.dataset&&t.dataset.fname!==undefined){const f=S.funds.find(x=>x.id===t.dataset.fname),v=t.value.trim();if(f&&v&&S.mode==='user'){f.name=v;save();renderAll()}else if(S.mode==='demo'){msg($('#fundMsg'),'This is the example portfolio. Import your holdings or start empty before changing funds.','err');renderFunds()}}
-  if(t.dataset&&t.dataset.fbench!==undefined){const f=S.funds.find(x=>x.id===t.dataset.fbench);if(f&&S.mode==='user'){f.bench=t.value;save();renderAll()}else if(S.mode==='demo'){msg($('#fundMsg'),'This is the example portfolio. Import your holdings or start empty before changing funds.','err');renderFunds()}}
+  if(t.dataset&&t.dataset.fbench!==undefined){const f=S.funds.find(x=>x.id===t.dataset.fbench);if(f&&S.mode==='user'){f.bench=t.value;save();renderAll()}else if(S.mode==='demo'){msg($('#fundMsg'),'This is the example portfolio. Import your holdings or start empty before changing funds.','err');renderFunds()}}\n  if(t.dataset&&t.dataset.ftotal!==undefined){const f=S.funds.find(x=>x.id===t.dataset.ftotal),v=t.value.trim()===''?0:Number(t.value);if(f&&S.mode==='user'&&Number.isFinite(v)&&v>=0){f.totalAssets=v;save();msg($('#fundMsg'),'Total asset amount saved for '+f.name+'.','ok')}else if(S.mode==='demo'){msg($('#fundMsg'),'This is the example portfolio. Import your holdings or start empty before changing fund settings.','err');renderFunds()}else if(!Number.isFinite(v)||v<0){msg($('#fundMsg'),'Enter a valid amount of zero or more.','err')}}
   if(t.id==='rfIn'){const v=parseFloat(t.value);if(isFinite(v)&&v>=0){S.rf=v;save();renderBench()}}
   if(t.dataset&&t.dataset.target!==undefined){const v=parseFloat(t.value);const TG=S.targets[S.view]||(S.targets[S.view]={});if(isFinite(v))TG[t.dataset.target]=v;else delete TG[t.dataset.target];save();renderRebalance()}
 });
