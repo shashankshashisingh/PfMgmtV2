@@ -7,8 +7,8 @@ const headers = {
   "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36",
   Accept: "text/csv,application/zip,*/*",
 };
-const readJson = (path, fallback) => {
-  try { return JSON.parse(fs.readFileSync(path, "utf8")); } catch { return fallback; }
+const readJson = (file, fallback) => {
+  try { return JSON.parse(fs.readFileSync(file, "utf8")); } catch { return fallback; }
 };
 const isoDate = d => d.toISOString().slice(0, 10);
 const ymd = d => isoDate(d).replaceAll("-", "");
@@ -27,53 +27,81 @@ async function fetchDay(date) {
     try {
       const response = await fetch(url, { headers, signal: AbortSignal.timeout(25000) });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const bytes = Buffer.from(await response.arrayBuffer());
-      const zip = new AdmZip(bytes);
+      const zip = new AdmZip(Buffer.from(await response.arrayBuffer()));
       const entry = zip.getEntries().find(e => e.entryName.toLowerCase().endsWith(".csv"));
       if (!entry) throw new Error("ZIP did not contain a CSV");
-      const csv = entry.getData().toString("utf8");
-      const rows = normalizeBhavcopyRows(parseCsv(csv), isoDate(date));
+      const rows = normalizeBhavcopyRows(parseCsv(entry.getData().toString("utf8")), isoDate(date));
       if (!rows.length) throw new Error("CSV contained no valid EQ/BE closing prices");
       return { date: isoDate(date), rows, url };
-    } catch (error) {
-      failures.push(`${url}: ${error.message}`);
-    }
+    } catch (error) { failures.push(`${url}: ${error.message}`); }
   }
   throw new Error(failures.join("; "));
 }
 
 fs.mkdirSync("data", { recursive: true });
-const existing = readJson("data/history.json", { series: {}, meta: {} });
+const oldHistory = readJson("data/history.json", { series: {}, meta: {} });
 const archive = readJson("data/bhavcopy.json", { days: {} });
-const cfg = readJson("symbols.json", {});
-const wanted = new Set((cfg.symbols || []).map(s => String(s).trim().toUpperCase()).filter(Boolean));
+const previousPrices = readJson("data/prices.json", { prices: {} });
+const previousDirectory = readJson("data/directory.json", { symbols: {} });
 const today = new Date();
 let result = null;
 const failures = [];
-// NSE archives are not published on weekends/holidays. Walk back up to seven days.
 for (let offset = 0; offset <= 7 && !result; offset++) {
   const date = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - offset));
   const day = isoDate(date);
-  if (archive.days?.[day]?.length && offset > 0) { result = { date: day, rows: archive.days[day], cached: true }; break; }
   try { result = await fetchDay(date); }
-  catch (error) { failures.push(`${day}: ${error.message}`); console.warn(failures.at(-1)); }
+  catch (error) {
+    failures.push(`${day}: ${error.message}`);
+    console.warn(failures.at(-1));
+    if (offset > 0 && archive.days?.[day]?.length) result = { date: day, rows: archive.days[day], cached: true };
+  }
 }
 if (!result) {
-  console.error("Unable to retrieve an NSE Bhavcopy for the last 8 calendar days.");
+  console.error("No usable NSE Bhavcopy found in the last 8 calendar days; leaving existing data files unchanged.");
   process.exit(1);
 }
 
 const allRows = result.rows;
-const relevant = wanted.size ? allRows.filter(r => wanted.has(r.symbol)) : allRows;
-const nextArchive = { ...archive, updated: new Date().toISOString(), latestDate: result.date, days: { ...(archive.days || {}), [result.date]: allRows } };
-// Keep a bounded archive in the MCP dataset; full daily series are maintained separately in history.json.
+const stamp = new Date().toISOString();
+const prices = {};
+const directory = { ...(previousDirectory.symbols || {}) };
+for (const row of allRows) {
+  const key = row.symbol;
+  prices[key] = {
+    ltp: row.close,
+    prevClose: row.previousClose,
+    changePct: row.previousClose > 0 ? Number(((row.close / row.previousClose - 1) * 100).toFixed(4)) : null,
+    name: row.name || directory[key]?.n || key,
+    sector: directory[key]?.s || "",
+    date: row.date,
+    source: "NSE Bhavcopy (end of day)",
+  };
+  directory[key] = {
+    n: row.name || directory[key]?.n || key,
+    c: directory[key]?.c || "Equities",
+    s: directory[key]?.s || "",
+  };
+}
+const nextArchive = {
+  ...archive, updated: stamp, latestDate: result.date,
+  days: { ...(archive.days || {}), [result.date]: allRows },
+};
 const dates = Object.keys(nextArchive.days).sort();
 for (const date of dates.slice(0, -30)) delete nextArchive.days[date];
-fs.writeFileSync("data/bhavcopy.json", JSON.stringify(nextArchive) + "\n");
 
-const merged = mergeBhavcopyHistory(existing, relevant);
+const merged = mergeBhavcopyHistory(oldHistory, allRows);
 merged.meta = { ...(merged.meta || {}) };
-for (const row of relevant) merged.meta[row.symbol] = { ...(merged.meta[row.symbol] || {}), name: merged.meta[row.symbol]?.name || row.symbol, cls: "Equities", source: "NSE Bhavcopy" };
+for (const row of allRows) {
+  merged.meta[row.symbol] = {
+    ...(merged.meta[row.symbol] || {}),
+    name: row.name || row.symbol,
+    cls: "Equities",
+    source: "NSE Bhavcopy",
+  };
+}
+fs.writeFileSync("data/bhavcopy.json", JSON.stringify(nextArchive) + "\n");
+fs.writeFileSync("data/prices.json", JSON.stringify({ updated: stamp, source: "NSE Bhavcopy (end of day)", tradingDate: result.date, prices, errors: {} }) + "\n");
+fs.writeFileSync("data/directory.json", JSON.stringify({ updated: stamp, source: "NSE Bhavcopy", symbols: directory }) + "\n");
 fs.writeFileSync("data/history.json", JSON.stringify(merged) + "\n");
-console.log(`Bhavcopy ${result.date}: ${allRows.length} EQ/BE rows; merged ${relevant.length} configured symbols into data/history.json`);
+console.log(`NSE Bhavcopy ${result.date}: wrote ${allRows.length} prices and symbol names; merged daily closes into history.`);
 if (failures.length) console.log(`Archive fallback attempts: ${failures.length}`);
