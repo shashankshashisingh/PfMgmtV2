@@ -15,7 +15,10 @@ A single-page portfolio dashboard for Indian holdings across asset classes (equi
 Equities, ETFs, Mutual Funds, Futures, Options, Commodities, REIT, InvIT, Money Market Funds, Long Term Fixed Income. Holdings are bundled under their class, with a subtotal row you can fold. Imports also accept common names (stock, etf, mf, gold, liquid, FD) and map them. Futures and options are valued as quantity times price. Stock transactions support Buy, Sell, Short sell and Cover short, with FIFO realized P&L. Short positions reserve margin equal to 115% of current short notional; the dashboard shows required margin and cash after margin. This is a portfolio simulation/ledger, not a broker margin engine, and does not place orders or enforce exchange-specific eligibility and settlement rules.
 
 ## Run
-Open `index.html` on GitHub Pages or serve the repository over HTTP. Holdings are stored in the browser's localStorage. Opening it as a `file://` URL blocks the browser from loading the repository's data files.
+Open `index.html` on GitHub Pages or serve the repository over HTTP. Visitors can use the example portfolio without signing in. When signed in, portfolio data is saved to the Supabase cloud account; theme preference stays in browser storage. Opening it as a `file://` URL blocks the browser from loading the repository's data files.
+
+## Accounts and cloud sync
+Email/password signup, login, password reset, and per-user cloud portfolio persistence are available. Supabase's public browser key is configured in `supabase-config.js`; it is protected by row-level security and is not a secret. Never add a Supabase service-role key to the website. See [SUPABASE_SETUP.md](SUPABASE_SETUP.md) for the dashboard checklist and [supabase/schema.sql](supabase/schema.sql) for the table/policies.
 
 ## Data sources
 

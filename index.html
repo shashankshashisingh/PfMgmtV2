@@ -120,6 +120,21 @@ details>.in{padding:0 16px 16px}
 .cols>*{flex:1 1 140px}
 pre.code{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:10px;font-family:var(--mono);font-size:12px;overflow-x:auto;margin:8px 0 0}
 section[hidden]{display:none!important}
+
+/* ---------- account access ---------- */
+.account-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.account-overlay{display:none;position:fixed;inset:0;z-index:1000;background:rgba(9,20,16,.58);padding:18px;align-items:center;justify-content:center}
+.account-overlay[aria-hidden="false"]{display:flex}
+.account-card{width:min(100%,420px);background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:22px;box-shadow:0 20px 70px rgba(0,0,0,.25)}
+.account-card h2{margin:0 0 6px;font-size:21px}
+.account-card p{color:var(--muted);font-size:13px;line-height:1.5}
+.account-card label{display:block;font-size:12px;font-weight:600;margin:14px 0 6px}
+.account-card input{display:block;width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink);padding:11px;font:inherit}
+.account-card .account-row{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:16px;flex-wrap:wrap}
+.account-card .account-message{font-size:12px;min-height:18px;margin:12px 0 0;overflow-wrap:anywhere}
+.account-card .account-link{background:none;border:0;color:var(--accent);text-decoration:underline;cursor:pointer;font:inherit;font-size:12px;padding:5px}
+@media(max-width:640px){.account-actions{justify-content:flex-start}.account-card{padding:18px}}
+
 </style>
 
 <div class="app">
@@ -130,9 +145,38 @@ section[hidden]{display:none!important}
     </div>
     <div class="status">
       <span id="status" style="display:contents"></span>
-      <button class="btn ghost sm" id="themeBtn" type="button" aria-label="Change colour theme">Theme: System</button>
+      <div class="account-actions">
+        <span id="accountStatus" class="pill">Cloud account not configured</span>
+        <button class="btn sm" id="accountOpen" type="button">Sign in / Sign up</button>
+        <button class="btn ghost sm" id="accountLogout" type="button" hidden>Sign out</button>
+        <button class="btn ghost sm" id="themeBtn" type="button" aria-label="Change colour theme">Theme: System</button>
+      </div>
     </div>
   </header>
+
+
+  <div class="account-overlay" id="accountOverlay" aria-hidden="true">
+    <section class="account-card" role="dialog" aria-modal="true" aria-labelledby="accountTitle">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:start">
+        <div><h2 id="accountTitle">Your portfolio, synced</h2><p id="accountIntro">Sign in to securely save your holdings to your own cloud account.</p></div>
+        <button class="btn ghost sm" id="accountClose" type="button" aria-label="Close sign in">Close</button>
+      </div>
+      <form id="accountForm">
+        <label for="accountEmail">Email</label>
+        <input id="accountEmail" name="email" type="email" autocomplete="email" required maxlength="254" placeholder="you@example.com">
+        <label for="accountPassword">Password</label>
+        <input id="accountPassword" name="password" type="password" autocomplete="current-password" required minlength="8" maxlength="128" placeholder="At least 8 characters">
+        <div class="account-row">
+          <button class="btn" id="accountSubmit" type="submit">Sign in</button>
+          <button class="account-link" id="accountSwitch" type="button">New here? Create an account</button>
+        </div>
+      </form>
+      <div class="account-row" style="justify-content:flex-start">
+        <button class="account-link" id="accountReset" type="button">Forgot password?</button>
+      </div>
+      <p class="account-message" id="accountMessage" role="status" aria-live="polite"></p>
+    </section>
+  </div>
 
   <nav class="tabs" id="tabs" role="tablist" aria-label="Sections">
     <button role="tab" data-tab="today" aria-selected="true">Today</button>
@@ -346,6 +390,8 @@ section[hidden]{display:none!important}
   </section>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.0"></script>
+<script src="./supabase-config.js"></script>
 <script>
 //#CORE-START
 const TD=252;
@@ -470,6 +516,88 @@ function normClass(c){
 const clsColor=c=>'var(--c'+(Math.max(0,CLASSES.indexOf(c))+1)+')';
 const PERIODS=['1M','3M','6M','YTD','1Y','All'];
 const LS='portfolio-desk.v1';
+
+const CLOUD_TABLE='portfolios',CLOUD_APP='portfolio-mgmt';
+let cloudClient=null,cloudUser=null,cloudReady=false,cloudSaveTimer=null,accountMode='login',removeLocalAfterCloudSave=false;
+function cloudConfigured(){
+  return typeof window.PORTFOLIO_SUPABASE_URL==='string'&&window.PORTFOLIO_SUPABASE_URL.startsWith('https://')&&
+    typeof window.PORTFOLIO_SUPABASE_ANON_KEY==='string'&&window.PORTFOLIO_SUPABASE_ANON_KEY.length>20&&
+    !window.PORTFOLIO_SUPABASE_ANON_KEY.includes('YOUR_SUPABASE');
+}
+function accountStatus(message){
+  const el=document.getElementById('accountStatus');
+  if(el)el.textContent=message;
+  const logout=document.getElementById('accountLogout');
+  if(logout)logout.hidden=!cloudUser;
+  const open=document.getElementById('accountOpen');
+  if(open){open.textContent=cloudUser?'Account':'Sign in / Sign up';open.hidden=!!cloudUser;}
+}
+function accountMessage(message){const el=document.getElementById('accountMessage');if(el)el.textContent=message||''}
+function openAccount(mode='login'){
+  accountMode=mode;
+  const overlay=document.getElementById('accountOverlay');
+  overlay.setAttribute('aria-hidden','false');
+  document.getElementById('accountTitle').textContent=mode==='signup'?'Create your account':mode==='reset'?'Reset your password':mode==='newpassword'?'Choose a new password':'Sign in to Portfolio Desk';
+  document.getElementById('accountIntro').textContent=mode==='signup'?'Create an account to keep your portfolio synced across devices.':mode==='reset'?'We will email you a password reset link.':mode==='newpassword'?'Choose a new password for your account.':'Your holdings and transactions will be saved to your private cloud account.';
+  document.getElementById('accountPassword').hidden=mode==='reset';
+  document.querySelector('label[for="accountPassword"]').hidden=mode==='reset';
+  document.getElementById('accountPassword').required=mode!=='reset';
+  document.getElementById('accountSubmit').textContent=mode==='signup'?'Create account':mode==='reset'?'Send reset link':mode==='newpassword'?'Update password':'Sign in';
+  document.getElementById('accountSwitch').hidden=mode==='reset'||mode==='newpassword';
+  document.getElementById('accountReset').hidden=mode!=='login';
+  accountMessage('');
+  if(!cloudConfigured())accountMessage('Cloud login is not configured yet. Complete the Supabase setup in SUPABASE_SETUP.md.');
+  setTimeout(()=>document.getElementById('accountEmail').focus(),0);
+}
+function closeAccount(){document.getElementById('accountOverlay').setAttribute('aria-hidden','true')}
+function localPortfolioForMigration(){
+  try{const raw=localStorage.getItem(LS);if(raw){const o=JSON.parse(raw);if(o&&o.mode==='user'&&Array.isArray(o.txns))return o}}catch(e){}
+  return null;
+}
+function portfolioSnapshot(){
+  const o=Object.assign({},S);delete o.live;delete o.feedUrl;return o;
+}
+async function persistCloudNow(){
+  if(!cloudClient||!cloudUser||!cloudReady||S.mode!=='user')return;
+  const snapshot=portfolioSnapshot();
+  const {error}=await cloudClient.from(CLOUD_TABLE).upsert({user_id:cloudUser.id,app:CLOUD_APP,data:snapshot,updated_at:new Date().toISOString()},{onConflict:'user_id,app'});
+  if(error)throw error;
+  if(removeLocalAfterCloudSave){try{localStorage.removeItem(LS)}catch(e){}removeLocalAfterCloudSave=false;}
+  accountStatus('Cloud saved · '+cloudUser.email);
+}
+function scheduleCloudSave(){
+  if(!cloudUser||!cloudReady)return;
+  clearTimeout(cloudSaveTimer);
+  cloudSaveTimer=setTimeout(()=>persistCloudNow().catch(e=>{console.error('Portfolio cloud save failed',e);accountStatus('Cloud save failed');accountMessage('Could not save to cloud. Your current page data is still open; check your connection and Supabase setup.')}),650);
+}
+async function loadCloudPortfolio(user){
+  cloudReady=false;cloudUser=user;accountStatus('Loading cloud portfolio…');
+  const {data,error}=await cloudClient.from(CLOUD_TABLE).select('data').eq('user_id',user.id).eq('app',CLOUD_APP).maybeSingle();
+  if(error)throw error;
+  if(data&&data.data&&typeof data.data==='object'){
+    S=Object.assign(blank(),data.data);S.live={};S.feedUrl='';normalize();removeLocalAfterCloudSave=false;
+  }else{
+    const local=localPortfolioForMigration();
+    if(local){S=Object.assign(blank(),local);S.live={};S.feedUrl='';normalize();removeLocalAfterCloudSave=true}
+    else {S=blank();normalize();removeLocalAfterCloudSave=false}
+  }
+  cloudReady=true;
+  await persistCloudNow();
+  compute();renderStatus();renderBanner();fillSymbolLists();setTab(activeTab);
+  accountStatus('Signed in · '+user.email);
+}
+async function initCloudAuth(){
+  if(!cloudConfigured()){cloudReady=true;accountStatus('Cloud setup required');return}
+  if(!window.supabase||typeof window.supabase.createClient!=='function'){cloudReady=true;accountStatus('Cloud library unavailable');return}
+  cloudClient=window.supabase.createClient(window.PORTFOLIO_SUPABASE_URL,window.PORTFOLIO_SUPABASE_ANON_KEY);
+  const {data,error}=await cloudClient.auth.getSession();
+  if(error){cloudReady=true;accountStatus('Sign in unavailable');console.error(error);return}
+  if(data.session){
+    try{await loadCloudPortfolio(data.session.user);if(window.location.hash.includes('type=recovery'))openAccount('newpassword')}
+    catch(e){cloudReady=true;console.error('Cloud portfolio load failed',e);accountStatus('Cloud connection error')}
+  }else{cloudReady=true;accountStatus('Not signed in · browser storage');if(window.location.hash.includes('type=recovery')){openAccount('login');accountMessage('This password reset link may have expired. Request a new one.')}}
+}
+
 const DEMO_TARGETS={'Equities':35,'ETFs':15,'Mutual Funds':20,'Commodities':5,'REIT':5,'InvIT':5,'Money Market Funds':5,'Long Term Fixed Income':10};
 
 /* ---------- time in IST ---------- */
@@ -572,6 +700,7 @@ function normalize(){
 function newFundId(){return 'f'+(Math.max(0,...S.funds.map(f=>parseInt(f.id.slice(1))||0))+1)}
 function save(){
   if(S.mode!=='user')return;
+  if(cloudUser){scheduleCloudSave();return}
   try{const o=Object.assign({},S);delete o.live;localStorage.setItem(LS,JSON.stringify(o))}catch(e){}
 }
 function load(){
@@ -1595,8 +1724,64 @@ $('#themeBtn').addEventListener('click',()=>{
 });
 applyTheme();
 
+
+/* ---------- account controls ---------- */
+document.getElementById('accountOpen').addEventListener('click',()=>cloudUser?accountMessage('Signed in as '+cloudUser.email+' · your portfolio is synced to your account.'):openAccount('login'));
+document.getElementById('accountClose').addEventListener('click',closeAccount);
+document.getElementById('accountOverlay').addEventListener('click',e=>{if(e.target.id==='accountOverlay')closeAccount()});
+document.getElementById('accountSwitch').addEventListener('click',()=>openAccount(accountMode==='signup'?'login':'signup'));
+document.getElementById('accountReset').addEventListener('click',()=>openAccount('reset'));
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAccount()});
+document.getElementById('accountForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const email=document.getElementById('accountEmail').value.trim();
+  const password=document.getElementById('accountPassword').value;
+  if(!cloudConfigured()||!cloudClient){accountMessage('Configure Supabase first using SUPABASE_SETUP.md.');return}
+  const submit=document.getElementById('accountSubmit');submit.disabled=true;accountMessage('Please wait…');
+  try{
+    if(accountMode==='reset'){
+      const {error}=await cloudClient.auth.resetPasswordForEmail(email,{redirectTo:PAGES_URL});
+      if(error)throw error;
+      accountMessage('If an account exists for that email, a password reset link will be sent.');
+    }else if(accountMode==='newpassword'){
+      const {error}=await cloudClient.auth.updateUser({password});
+      if(error)throw error;
+      closeAccount();accountStatus('Password updated');
+      try{history.replaceState(null,'',PAGES_URL)}catch(e){}
+    }else if(accountMode==='signup'){
+      const {data,error}=await cloudClient.auth.signUp({email,password,options:{emailRedirectTo:PAGES_URL}});
+      if(error)throw error;
+      if(data.session&&data.user){
+        await loadCloudPortfolio(data.user);closeAccount();
+      }else{
+        accountMessage('Account created. Check your email to confirm the address, then sign in.');
+      }
+    }else{
+      const {data,error}=await cloudClient.auth.signInWithPassword({email,password});
+      if(error)throw error;
+      if(data.user)await loadCloudPortfolio(data.user);
+      closeAccount();
+    }
+  }catch(err){
+    console.error('Account action failed',err);
+    accountMessage(err&&err.message?err.message:'Could not complete account action. Please try again.');
+  }finally{submit.disabled=false}
+});
+document.getElementById('accountLogout').addEventListener('click',async()=>{
+  if(!cloudClient||!cloudUser)return;
+  try{
+    clearTimeout(cloudSaveTimer);
+    if(cloudReady&&S.mode==='user')await persistCloudNow();
+    await cloudClient.auth.signOut();
+    cloudUser=null;cloudReady=true;
+    S=demoState();compute();renderStatus();renderBanner();fillSymbolLists();setTab('today');
+    accountStatus('Not signed in · browser storage');
+  }catch(e){console.error(e);accountStatus('Sign out failed')}
+});
+
 /* ---------- boot ---------- */
 load();
+initCloudAuth();
 $('#fDate').value=istNow().date;
 initSim();
 if(S.mode==='demo'&&!S.bench)S.bench='NIFTY50';
