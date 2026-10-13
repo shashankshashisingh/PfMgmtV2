@@ -1108,7 +1108,16 @@ async function pollFeed(show){
     for(const s in j){
       const v=j[s],p=typeof v==='number'?v:(v&&(v.ltp!=null?v.ltp:v.price)),K=s.toUpperCase();
       if(v&&typeof v==='object'&&(v.name||v.sector))FEED.meta[K]={name:v.name||'',sector:v.sector||''};
-      if(isFinite(p)&&S.series[K]){S.live[K]=+p;n++}
+      if(isFinite(p)&&Number(p)>0){
+        // A live quote must still work when this symbol has no historical series yet.
+        // Seed a one-point series so the dashboard can value a newly added holding.
+        if(!S.series[K]){
+          const day=istNow().date;
+          S.series[K]={d:[day],c:[Number(p)]};
+          if(!S.meta[K])S.meta[K]={name:FEED.meta[K]?.name||K,cls:'Equities',sector:FEED.meta[K]?.sector||''};
+        }
+        S.live[K]=Number(p);n++;
+      }
     }
     if(j0&&j0.updated)FEED.updated=j0.updated;
     if(S.feedUrl==='data/prices.json'){REPO.priceCount=Object.keys(j).length;REPO.priceUpdated=(j0&&j0.updated)||'';REPO.priceErrors=(j0&&j0.errors)||{};REPO.priceErr='';FEED.raw=j0;if(activeTab==='data')renderRepoStatus()}
