@@ -29,7 +29,7 @@ Two jobs keep the `data/` folder fresh. The dashboard reads it when served from 
 
 | Job | When | Writes | Source |
 |---|---|---|---|
-| Update prices | every 10 minutes during NSE hours, and when `symbols.json` changes | `data/prices.json` (all NIFTY 500 stocks plus your symbols and benchmark indices), `data/directory.json` (symbol names for lookup, daily) | [stock-nse-india](https://github.com/hi-imcodeman/stock-nse-india) and NSE listing files |
+| Update prices | every 15 minutes during NSE hours, and when `symbols.json` changes | `data/prices.json` (all NIFTY 500 stocks plus your symbols and benchmark indices), `data/directory.json` (symbol names for lookup, daily) | [stock-nse-india](https://github.com/hi-imcodeman/stock-nse-india) and NSE listing files |
 | Update price history | daily at 17:00 IST, and when `symbols.json` changes | `data/history.json` (daily closes for your symbols and indices) | [jugaad-data](https://github.com/jugaad-py/jugaad-data) |
 
 Setup:
@@ -37,7 +37,7 @@ Setup:
 2. Put your symbols in `symbols.json`. The Data tab has a "Copy symbols.json" button. Committing the file runs both jobs.
 3. Open the Data tab: "Live data status" shows what loaded and what did not.
 
-From GitHub's servers NSE currently refuses the bulk NIFTY 500 quote call and the live index levels (HTTP 403), but single-stock quotes, the symbol list and daily history work. So live prices cover only the symbols in `symbols.json`, and benchmark statistics run up to the last close. Scheduled runs can be delayed by several minutes, so prices are near-live. NSE sometimes blocks cloud servers. If a job fails, the log in the Actions tab has the reason, and the dashboard keeps the last good data.
+From GitHub's servers NSE currently refuses the bulk NIFTY 500 quote call and the live index levels (HTTP 403), but single-stock quotes, the symbol list and daily history work. So the job asks for one stock at a time: first the symbols in `symbols.json`, then every stock in the lists named under `universe` (NIFTY 500 by default), so most holdings get a price without being listed. Anything outside those lists needs adding to `symbols.json`, and benchmark statistics run up to the last close. Scheduled runs can be delayed by several minutes, so prices are near-live. NSE sometimes blocks cloud servers. If a job fails, the log in the Actions tab has the reason, and the dashboard keeps the last good data.
 
 The Claude preview cannot reach NSE or this repository, so symbol lookup there uses Claude and prices are not live.
 

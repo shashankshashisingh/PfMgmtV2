@@ -2,8 +2,8 @@ name: Update prices
 
 on:
   schedule:
-    # Every 10 minutes, Mon-Fri, 09:00-15:59 IST (03:30-10:29 UTC)
-    - cron: '*/10 3-10 * * 1-5'
+    # Every 15 minutes, Mon-Fri, 09:00-15:59 IST (03:30-10:29 UTC)
+    - cron: '*/15 3-10 * * 1-5'
   workflow_dispatch:
   push:
     paths:

@@ -1294,7 +1294,8 @@ $('#txnForm').addEventListener('submit',e=>{
   const old=S.meta[sym]||{};
   S.meta[sym]={name:$('#fName').value.trim()||old.name||sym,cls:$('#fCls').value,sector:(lookedUp[sym]&&lookedUp[sym].sector)||old.sector||''};
   if(!S.series[sym])S.series[sym]={d:[date],c:[price]};
-  if(isFinite(cur)&&cur>0)S.manual[sym]=cur;
+  const fp=FEED.raw&&FEED.raw.prices&&FEED.raw.prices[sym];
+  if(isFinite(cur)&&cur>0&&!(fp&&Math.abs(fp.ltp-cur)<1e-6))S.manual[sym]=cur;
   save();
   afterDataChange();
   $('#fQty').value='';$('#fPrice').value='';$('#fCur').value='';

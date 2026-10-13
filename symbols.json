@@ -1,4 +1,5 @@
 {
   "symbols": ["RELIANCE", "TCS", "HDFCBANK", "INFY", "ITC"],
+  "universe": ["NIFTY 500"],
   "indices": ["NIFTY 50", "NIFTY MIDCAP 150", "NIFTY SMALLCAP 250"]
 }
