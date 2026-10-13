@@ -582,6 +582,8 @@ function simTick(){
   if(!Object.keys(S.live).length){initSim();return}
   const m=.00035*gauss(Math.random);
   for(const s in S.live){
+    // Keep real repository quotes stable; only simulate symbols without a fetched quote.
+    if(FEED.raw?.prices?.[s])continue;
     const fixed=DEMO_AUX.fixed[s];
     if(fixed)continue;
     const b=DEMO_AUX.beta[s]||0,id=DEMO_AUX.idio[s]||0;
@@ -731,7 +733,7 @@ function range(){return rangeFor(C)}
 function renderStatus(){
   const ist=C.ist||istNow();
   const state=ist.open?'Market open':ist.preopen?'Pre-open':'Market closed';
-  const feed=S.mode==='demo'?'Simulated prices':S.feedUrl?'Live feed':'Manual and imported prices';
+  const feed=S.mode==='demo'?(FEED.updated?'Live quotes + simulated fallback':'Simulated prices'):S.feedUrl?'Live feed':'Manual and imported prices';
   const upd=S.mode==='user'&&S.feedUrl&&FEED.updated?' · '+new Date(FEED.updated).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Kolkata'}):'';
   $('#status').innerHTML='<span class="pill"><span class="dot '+(ist.open?'open':'')+'"></span>NSE '+state+'</span><span class="pill">'+esc(feed+upd)+'</span><span class="mono">'+ist.stamp+' IST</span>';
 }
@@ -1129,7 +1131,7 @@ async function pollFeed(show){
 }
 function startFeed(){
   clearInterval(feedTimer);
-  if(S.mode==='user'&&S.feedUrl){pollFeed(false);feedTimer=setInterval(()=>pollFeed(false),30000)}
+  if((S.mode==='user'||S.mode==='demo')&&S.feedUrl){pollFeed(false);feedTimer=setInterval(()=>pollFeed(false),30000)}
 }
 
 /* ---------- events ---------- */
@@ -1255,6 +1257,9 @@ async function loadRepoData(){
   if(S.mode==='user'){
     applyHistory();
     if(!S.feedUrl&&REPO.priceCount>0){S.feedUrl='data/prices.json';save();startFeed()}
+  }else if(S.mode==='demo'&&!S.feedUrl&&REPO.priceCount>0){
+    // Load repository quotes automatically even before the user imports a portfolio.
+    S.feedUrl='data/prices.json';startFeed();
   }
   renderRepoStatus();
 }
