@@ -1,0 +1,8 @@
+[
+  { "nse": "NIFTY 50", "key": "NIFTY50", "name": "Nifty 50" },
+  { "nse": "NIFTY NEXT 50", "key": "NIFTYNEXT50", "name": "Nifty Next 50" },
+  { "nse": "NIFTY 500", "key": "NIFTY500", "name": "Nifty 500" },
+  { "nse": "NIFTY MIDCAP 150", "key": "NIFTYMID150", "name": "Nifty Midcap 150" },
+  { "nse": "NIFTY SMALLCAP 250", "key": "NIFTYSMALL250", "name": "Nifty Smallcap 250" },
+  { "nse": "NIFTY BANK", "key": "NIFTYBANK", "name": "Nifty Bank" }
+]

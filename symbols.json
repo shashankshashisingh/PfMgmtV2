@@ -1,3 +1,4 @@
 {
-  "symbols": ["RELIANCE", "TCS", "HDFCBANK", "INFY", "ITC"]
+  "symbols": ["RELIANCE", "TCS", "HDFCBANK", "INFY", "ITC"],
+  "indices": ["NIFTY 50", "NIFTY MIDCAP 150", "NIFTY SMALLCAP 250"]
 }

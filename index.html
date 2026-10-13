@@ -272,6 +272,11 @@ section[hidden]{display:none!important}
   <!-- DATA -->
   <section id="tab-data" class="stack" hidden>
     <div class="panel">
+      <h2>Live data status</h2>
+      <div id="repoStatus"></div>
+      <div class="cols" style="margin-top:12px"><button class="btn ghost" type="button" id="repoReload" style="flex:0 0 auto">Check again</button></div>
+    </div>
+    <div class="panel">
       <h2>Import</h2>
       <p class="note" style="margin:0 0 10px">Paste CSV or choose a file. The type is detected from the header row.</p>
       <div class="cols">
@@ -521,7 +526,9 @@ function buildDemo(){
 
 /* ---------- state ---------- */
 let S=null,DEMO_AUX=null;
-const FEED={meta:{},updated:''};
+const FEED={meta:{},updated:'',dir:{},hist:null,raw:null};
+const REPO={env:'',priceCount:0,priceUpdated:'',priceErr:'',priceErrors:{},dirCount:0,dirErr:'',histCount:0,histUpdated:'',histErr:''};
+const PAGES_URL='https://shashankshashisingh.github.io/PortfolioMgmt/';
 function blank(){return {mode:'user',ver:2,txns:[],meta:{},series:{},manual:{},live:{},bench:'',rf:7,targets:{},feedUrl:'',period:'1Y',sort:{k:'value',dir:-1},nextId:1,funds:[{id:'f1',name:'Main',bench:''}],view:'ALL'}}
 function demoState(){
   const d=buildDemo();DEMO_AUX={beta:d.beta,idio:d.idio,fixed:d.fixed};
@@ -627,6 +634,7 @@ function compute(){
   if(liveOn){dates.push(ist.date);for(const s in px)px[s].push(L[s]!=null?L[s]:px[s][px[s].length-1])}
   else if(hasLive&&ist.date===lastHist){for(const s in px)if(L[s]!=null)px[s][px[s].length-1]=L[s]}
   const n=dates.length;
+  for(const s in px)if(S.series[s].d.length<=2&&L[s]!=null)px[s][n-1]=L[s];
   C=Object.assign({dates,px,n,ist,liveOn},analyze(viewTxns(),px,dates,n));
 }
 function totals(A){
@@ -802,8 +810,13 @@ function renderTxns(){
     t.map(x=>'<tr><td>'+esc(fmtD(x.date))+'</td><td>'+esc(fundName(x.fund))+'</td><td class="'+(x.type==='BUY'?'':'loss')+'">'+(x.type==='BUY'?'Buy':'Sell')+'</td><td>'+esc(x.symbol)+'</td><td class="n">'+nm(x.qty,x.qty%1?3:0)+'</td><td class="n">'+inr(x.price,2)+'</td><td class="n">'+inr(x.qty*x.price)+'</td><td><button class="btn ghost sm" data-del="'+x.id+'" aria-label="Delete transaction">Delete</button></td></tr>').join('')+'</tbody></table>';
 }
 function fillSymbolLists(){
-  const syms=Object.keys(S.series).filter(s=>(S.meta[s]||{}).cls!=='Index').sort();
-  $('#symList').innerHTML=syms.map(s=>'<option value="'+esc(s)+'">'+esc((S.meta[s]||{}).name||'')+'</option>').join('');
+  const symSet=new Set(Object.keys(S.series).filter(s=>(S.meta[s]||{}).cls!=='Index'));
+  for(const s in FEED.dir)symSet.add(s);
+  const sig=symSet.size+':'+Object.keys(S.series).length;
+  if(fillSymbolLists.sig!==sig){
+    fillSymbolLists.sig=sig;
+    $('#symList').innerHTML=[...symSet].sort().map(s=>'<option value="'+esc(s)+'">'+esc(((S.meta[s]||{}).name)||(FEED.dir[s]&&FEED.dir[s].n)||'')+'</option>').join('');
+  }
   const bk=processTxns(S.txns);
   const held=Object.keys(bk).filter(s=>sum(bk[s].lots.map(l=>l.qty))>1e-9).sort();
   $('#pSym').innerHTML=held.map(s=>'<option>'+esc(s)+'</option>').join('');
@@ -968,6 +981,7 @@ function renderRebalance(){
 }
 function renderData(){
   $('#feedUrl').value=S.feedUrl||'';
+  renderRepoStatus();
 }
 function renderAll(){
   compute();
@@ -1069,12 +1083,14 @@ function importCSV(text){
   }
   if(!S.bench){const c=benchCandidates();if(c.length)S.bench=c[0]}
   save();
+  afterDataChange();
   return {ok,bad,warns,kind:isTx?'transactions':'price rows'};
 }
 function ensureUser(){
   if(S.mode==='user')return;
   const keep=S.rf;
   S=blank();S.rf=keep;
+  setTimeout(loadRepoData,0);
 }
 
 /* ---------- live feed (optional) ---------- */
@@ -1094,6 +1110,7 @@ async function pollFeed(show){
       if(isFinite(p)&&S.series[K]){S.live[K]=+p;n++}
     }
     if(j0&&j0.updated)FEED.updated=j0.updated;
+    if(S.feedUrl==='data/prices.json'){REPO.priceCount=Object.keys(j).length;REPO.priceUpdated=(j0&&j0.updated)||'';REPO.priceErrors=(j0&&j0.errors)||{};REPO.priceErr='';FEED.raw=j0;if(activeTab==='data')renderRepoStatus()}
     if(show){msg.className='msg ok';msg.textContent='Received '+n+' prices at '+istNow().stamp+' IST.'}
     renderAll();
   }catch(e){
@@ -1124,7 +1141,7 @@ document.addEventListener('click',e=>{
   }
   if(t.dataset.del){S.txns=S.txns.filter(x=>String(x.id)!==t.dataset.del);save();renderAll();return}
   if(t.id==='goData'){setTab('data');return}
-  if(t.id==='startBlank'){S=blank();save();clearInterval(feedTimer);renderAll();setTab('holdings');$('#addBox').open=true;return}
+  if(t.id==='startBlank'){S=blank();save();clearInterval(feedTimer);renderAll();afterDataChange();setTab('holdings');$('#addBox').open=true;return}
 });
 document.addEventListener('change',e=>{
   const t=e.target;
@@ -1140,12 +1157,31 @@ $('#fSym').addEventListener('input',e=>{
   if(m){if(!$('#fName').value)$('#fName').value=m.name||'';if(CLASSES.includes(m.cls))$('#fCls').value=m.cls}
 });
 const lookedUp={};
+function localLookup(sym){
+  const d=FEED.dir[sym],f=FEED.meta[sym];
+  const name=(d&&d.n)||(f&&f.name)||'';
+  if(!name)return null;
+  return {name,cls:(d&&normClass(d.c))||null,sector:(f&&f.sector)||(d&&d.s)||''};
+}
+function applyLocal(sym,r,src){
+  $('#fName').value=r.name;
+  if(r.cls)$('#fCls').value=r.cls;
+  lookedUp[sym]={sector:r.sector||''};
+  const px=FEED.raw&&FEED.raw.prices&&FEED.raw.prices[sym];
+  if(px&&isFinite(px.ltp)&&!$('#fCur').value)$('#fCur').value=px.ltp;
+  msg($('#txnMsg'),'Filled '+r.name+(r.sector?' · '+r.sector:'')+' from '+src+(px&&isFinite(px.ltp)?'. Current price '+inr(px.ltp,2)+' filled in; enter your own buy price.':'. Enter the price.'),'ok');
+  if(!$('#fPrice').value)$('#fPrice').focus();
+}
 async function lookupSymbol(){
   const sym=$('#fSym').value.trim().toUpperCase(),M=$('#txnMsg');
   if(!sym){msg(M,'Type a symbol first.','err');return}
+  const loc=localLookup(sym);
+  if(loc){applyLocal(sym,loc,'the NSE symbol list');return}
   let sample=null;
   try{if(window.claude&&window.claude.use)sample=await window.claude.use('sample')}catch(e){}
-  if(!sample){msg(M,'Symbol lookup is not available in this view. Enter the name and class by hand.','');return}
+  if(!sample){
+    const why=REPO.env==='pages'?(REPO.dirCount?sym+' is not in the symbol list. Enter the name and class by hand.':'The symbol list has not been built yet. In your GitHub repo, open Actions, run "Update prices", then use Check again on the Data tab.'):'Symbol lookup needs your GitHub Pages site or the Claude preview. Enter the name and class by hand.';
+    msg(M,why,'');return}
   msg(M,'Looking up '+sym+'…','');
   try{
     const r=await sample.json('Identify the Indian listed security or fund with the NSE or BSE symbol "'+sym+'". Reply with JSON only, in this shape: {"name": string or null, "assetClass": one of ["Equities","ETFs","Mutual Funds","Futures","Options","Commodities","REIT","InvIT","Money Market Funds","Long Term Fixed Income","Other"], "sector": string or null}. Use null for name if you are not confident the symbol exists. Listed company shares are "Equities". Exchange traded funds, including gold and index ETFs, are "ETFs". Mutual fund schemes are "Mutual Funds", except liquid and overnight funds, which are "Money Market Funds". Sovereign gold bonds are "Commodities". Bond funds, G-secs and fixed deposits are "Long Term Fixed Income". Do not include prices.',{modelTier:'quick'});
@@ -1163,22 +1199,77 @@ async function lookupSymbol(){
 $('#fLookup').addEventListener('click',lookupSymbol);
 $('#fSym').addEventListener('change',()=>{
   const s=$('#fSym').value.trim().toUpperCase();
-  const fm=FEED.meta[s];
-  if(s&&fm&&fm.name&&!$('#fName').value.trim()){
-    $('#fName').value=fm.name;lookedUp[s]={sector:fm.sector||''};
-    msg($('#txnMsg'),'Filled '+fm.name+(fm.sector?' · '+fm.sector:'')+' from the price feed.','ok');
-    return;
-  }
-  if(s&&!S.meta[s]&&!$('#fName').value.trim())lookupSymbol();
+  if(!s||$('#fName').value.trim())return;
+  const loc=localLookup(s);
+  if(loc){applyLocal(s,loc,FEED.dir[s]?'the NSE symbol list':'the price feed');return}
+  if(!S.meta[s])lookupSymbol();
 });
-async function tryRepoFeed(){
-  if(S.mode!=='user'||S.feedUrl||!/^https?:$/.test(location.protocol))return;
-  try{
-    const r=await fetch('data/prices.json',{cache:'no-store'});
-    if(!r.ok)return;
-    const j=await r.json();
-    if(j&&j.prices){S.feedUrl='data/prices.json';save();startFeed()}
-  }catch(e){}
+
+/* ---------- repo data: prices, symbol directory, history ---------- */
+function hostKind(){
+  if(/github\.io$/.test(location.hostname))return 'pages';
+  if(window.claude)return 'claude';
+  if(/^https?:$/.test(location.protocol))return 'web';
+  return 'file';
+}
+async function getJSON(u){const r=await fetch(u,{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
+function applyHistory(){
+  if(S.mode!=='user'||!FEED.hist||!FEED.hist.series)return;
+  const held=new Set(S.txns.map(t=>t.symbol));
+  let changed=false;
+  for(const k in FEED.hist.series){
+    const m=(FEED.hist.meta||{})[k],isIdx=!!(m&&m.cls==='Index'),hs=FEED.hist.series[k];
+    if(!hs||!hs.d||hs.d.length<2||(!held.has(k)&&!isIdx))continue;
+    const cur=S.series[k],mp=new Map();
+    if(cur)cur.d.forEach((d,i)=>mp.set(d,cur.c[i]));
+    hs.d.forEach((d,i)=>mp.set(d,hs.c[i]));
+    const ds=[...mp.keys()].sort(),merged={d:ds,c:ds.map(d=>mp.get(d))};
+    if(!cur||cur.d.length!==ds.length||cur.c[cur.c.length-1]!==merged.c[merged.c.length-1]){S.series[k]=merged;changed=true}
+    if(isIdx&&!S.meta[k])S.meta[k]={name:m.name||k,cls:'Index'};
+    else if(!S.meta[k]){const d=FEED.dir[k];S.meta[k]={name:(d&&d.n)||k,cls:(d&&normClass(d.c))||'Equities',sector:(d&&d.s)||''}}
+  }
+  if(changed){if(!S.bench||!S.series[S.bench]){const c=benchCandidates();if(c.length)S.bench=c[0]}save();renderAll()}
+}
+function afterDataChange(){
+  if(S.mode!=='user'||(REPO.env!=='pages'&&REPO.env!=='web'))return;
+  applyHistory();
+  if(!S.feedUrl&&REPO.priceCount>0){S.feedUrl='data/prices.json';save();startFeed()}
+}
+async function loadRepoData(){
+  REPO.env=hostKind();
+  if(REPO.env==='file'||REPO.env==='claude'){renderRepoStatus();return}
+  try{const j=await getJSON('data/directory.json');FEED.dir=j.symbols||{};REPO.dirCount=Object.keys(FEED.dir).length;REPO.dirErr=''}catch(e){REPO.dirErr=e.message}
+  try{const j=await getJSON('data/history.json');FEED.hist=j;REPO.histCount=Object.keys(j.series||{}).length;REPO.histUpdated=j.updated||'';REPO.histErr=''}catch(e){REPO.histErr=e.message}
+  try{const j=await getJSON('data/prices.json');FEED.raw=j;REPO.priceCount=Object.keys(j.prices||{}).length;REPO.priceUpdated=j.updated||'';REPO.priceErrors=j.errors||{};REPO.priceErr=''}catch(e){REPO.priceErr=e.message}
+  fillSymbolLists();
+  if(S.mode==='user'){
+    applyHistory();
+    if(!S.feedUrl&&REPO.priceCount>0){S.feedUrl='data/prices.json';save();startFeed()}
+  }
+  renderRepoStatus();
+}
+function ago(iso){
+  if(!iso)return '';
+  const m=Math.round((Date.now()-Date.parse(iso))/60000);
+  if(!isFinite(m))return '';
+  return m<1?'just now':m<60?m+' min ago':m<1440?Math.round(m/60)+' h ago':Math.round(m/1440)+' days ago';
+}
+function renderRepoStatus(){
+  const el=$('#repoStatus');if(!el)return;
+  const line=(ok,label,text)=>'<div class="row" style="grid-template-columns:auto 1fr"><span class="'+(ok?'gain':'loss')+'" aria-hidden="true">'+(ok?'●':'○')+'</span><span><b>'+label+'</b> <span class="muted">'+text+'</span></span></div>';
+  if(REPO.env==='claude'){
+    el.innerHTML='<p>This is the Claude preview. It can look up a symbol with Claude, but it cannot reach NSE or your repository, so there are no live prices here.</p><p class="note">Open your GitHub Pages site for live prices, the symbol list and price history: <a href="'+PAGES_URL+'" target="_blank" rel="noopener">'+PAGES_URL+'</a></p>';return}
+  if(REPO.env==='file'){
+    el.innerHTML='<p>This page was opened from a file, so the browser blocks reading the price files. Serve it over http, for example from GitHub Pages.</p>';return}
+  if(!REPO.env){el.innerHTML='<p class="muted">Checking…</p>';return}
+  const errs=Object.entries(REPO.priceErrors||{}).slice(0,3).map(e=>esc(e[0])+': '+esc(e[1])).join('<br>');
+  const pOk=REPO.priceCount>0&&!!REPO.priceUpdated;
+  el.innerHTML=
+    line(pOk,'Live prices',pOk?REPO.priceCount+' symbols, updated '+ago(REPO.priceUpdated)+(S.mode==='demo'?'. The example portfolio uses simulated prices.':''):(REPO.priceErr?'could not read data/prices.json ('+esc(REPO.priceErr)+')':'data/prices.json is empty. In your repo, open Actions and run "Update prices".'))+
+    line(REPO.dirCount>0,'Symbol list',REPO.dirCount>0?REPO.dirCount.toLocaleString('en-IN')+' symbols for lookup':(REPO.dirErr?'could not read data/directory.json ('+esc(REPO.dirErr)+')':'not built yet. It is created by the same "Update prices" run.'))+
+    line(REPO.histCount>0,'Price history',REPO.histCount>0?REPO.histCount+' series, updated '+ago(REPO.histUpdated):(REPO.histErr?'could not read data/history.json ('+esc(REPO.histErr)+')':'empty. Run "Update price history" in Actions. It feeds the statistics and benchmark tabs.'))+
+    (errs?'<p class="note">Last job reported: '+errs+'</p>':'')+
+    ((!pOk||!REPO.dirCount)?'<p class="note">If a job shows a red cross in Actions, NSE is probably blocking GitHub\'s servers. The job log has the reason.</p>':'');
 }
 $('#txnForm').addEventListener('submit',e=>{
   e.preventDefault();
@@ -1198,6 +1289,7 @@ $('#txnForm').addEventListener('submit',e=>{
   if(!S.series[sym])S.series[sym]={d:[date],c:[price]};
   if(isFinite(cur)&&cur>0)S.manual[sym]=cur;
   save();
+  afterDataChange();
   $('#fQty').value='';$('#fPrice').value='';$('#fCur').value='';
   msg(M,(type==='BUY'?'Bought ':'Sold ')+qty+' '+sym+'.','ok');
   renderAll();
@@ -1245,9 +1337,10 @@ $('#copyTx').addEventListener('click',async()=>{
   try{await navigator.clipboard.writeText(text);msg($('#dataMsg'),'Copied '+(lines.length-1)+' transactions.','ok')}
   catch(e){$('#csvIn').value=text;$('#csvIn').select();msg($('#dataMsg'),'Clipboard blocked. The CSV is in the import box above, ready to copy.','')}
 });
+$('#repoReload').addEventListener('click',loadRepoData);
 $('#copySyms').addEventListener('click',async()=>{
   const syms=[...new Set(S.txns.map(t=>t.symbol))].filter(s=>(S.meta[s]||{}).cls!=='Index').sort();
-  const text=JSON.stringify({symbols:syms},null,2)+'\n';
+  const text=JSON.stringify({symbols:syms,indices:['NIFTY 50','NIFTY MIDCAP 150','NIFTY SMALLCAP 250']},null,2)+'\n';
   try{await navigator.clipboard.writeText(text);msg($('#dataMsg'),'Copied '+syms.length+' symbols. Paste them into symbols.json in your repo so the price job fetches them.','ok')}
   catch(e){$('#csvIn').value=text;$('#csvIn').select();msg($('#dataMsg'),'Clipboard blocked. The JSON is in the import box above, ready to copy.','')}
 });
@@ -1285,7 +1378,7 @@ try{const h=location.hash.replace('#','');if(['today','funds','holdings','stats'
 compute();renderStatus();renderBanner();fillSymbolLists();
 setTab(startTab);
 startFeed();
-tryRepoFeed();
+loadRepoData();
 let lastHeavy=0;
 setInterval(()=>{
   const ist=istNow();

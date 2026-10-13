@@ -24,13 +24,22 @@ Open `index.html` in a browser. No build step. Holdings are stored in the browse
 - Optional custom feed: any JSON endpoint returning `{"RELIANCE": 1432.5}`.
 - The symbol auto-fill (name, class, sector) only works inside Claude's artifact viewer.
 
-## Live prices setup
-1. In the repo, open Settings, then Pages, and publish the `main` branch (root). The dashboard then lives at your Pages URL.
-2. Put your symbols in `symbols.json`. The Data tab has a "Copy symbols.json" button.
-3. Run the "Update prices" workflow once from the Actions tab to check that NSE answers from GitHub's servers. NSE sometimes blocks cloud networks. If every symbol fails, the job stops and leaves the last prices in place.
-4. Open the Pages URL, import your holdings, and the status bar shows the feed time.
+## Live data (GitHub Actions)
+Two jobs keep the `data/` folder fresh. The dashboard reads it when served from GitHub Pages.
 
-Scheduled GitHub Actions runs can be delayed by several minutes, so treat prices as near-live, not tick-by-tick.
+| Job | When | Writes | Source |
+|---|---|---|---|
+| Update prices | every 10 minutes during NSE hours, and when `symbols.json` changes | `data/prices.json` (all NIFTY 500 stocks plus your symbols and benchmark indices), `data/directory.json` (symbol names for lookup, daily) | [stock-nse-india](https://github.com/hi-imcodeman/stock-nse-india) and NSE listing files |
+| Update price history | daily at 17:00 IST, and when `symbols.json` changes | `data/history.json` (daily closes for your symbols and indices) | [jugaad-data](https://github.com/jugaad-py/jugaad-data) |
+
+Setup:
+1. Settings, then Pages: publish the `main` branch (root).
+2. Put your symbols in `symbols.json`. The Data tab has a "Copy symbols.json" button. Committing the file runs both jobs.
+3. Open the Data tab: "Live data status" shows what loaded and what did not.
+
+Scheduled runs can be delayed by several minutes, so prices are near-live. NSE sometimes blocks cloud servers. If a job fails, the log in the Actions tab has the reason, and the dashboard keeps the last good data.
+
+The Claude preview cannot reach NSE or this repository, so symbol lookup there uses Claude and prices are not live.
 
 ## Tests
 `node tests/core.test.js`
