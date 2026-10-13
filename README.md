@@ -11,6 +11,9 @@ A single-page portfolio dashboard for Indian holdings across asset classes (equi
 - **Rebalance**: target weights and trades needed
 - Light, dark and system themes
 
+## Asset classes
+Equities, Futures, Options, Commodities, REIT, InvIT, Money Market Funds, Long Term Fixed Income. Imports also accept common names (stock, ETF, gold, liquid, FD) and map them. Futures and options are valued as quantity times price; short positions and margin are not modelled yet.
+
 ## Run
 Open `index.html` in a browser. No build step. Holdings are stored in the browser's localStorage.
 

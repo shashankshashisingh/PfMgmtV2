@@ -7,7 +7,7 @@
 :root{
   --bg:#F3F6F3; --surface:#FFFFFF; --ink:#14201C; --muted:#5B6862; --line:#DCE3DE; --soft:#EBF0EC;
   --accent:#0B6B5D; --accent-ink:#FFFFFF; --gain:#17803F; --loss:#B93A2E; --warn:#9A6200;
-  --c1:#0B6B5D; --c2:#3B6FB6; --c3:#7A5AA6; --c4:#C48A12; --c5:#8C6E4A; --c6:#5F7384; --c7:#98A39D;
+  --c1:#0B6B5D; --c2:#3B6FB6; --c3:#7A5AA6; --c4:#C48A12; --c5:#8C6E4A; --c6:#5F7384; --c7:#B5527A; --c8:#2E8FA3; --c9:#98A39D;
   --bench:#6B7A74;
   --font:'Instrument Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
   --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
@@ -15,12 +15,12 @@
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#0D1311; --surface:#151D1A; --ink:#E5ECE8; --muted:#92A09A; --line:#25302C; --soft:#1B2521;
   --accent:#3FC3AA; --accent-ink:#06201B; --gain:#4CC27F; --loss:#F0786B; --warn:#E0A64A;
-  --c1:#3FC3AA; --c2:#6B9BE0; --c3:#A98BD6; --c4:#E0AC3A; --c5:#C19C6C; --c6:#8EA4B6; --c7:#6E7B75;
+  --c1:#3FC3AA; --c2:#6B9BE0; --c3:#A98BD6; --c4:#E0AC3A; --c5:#C19C6C; --c6:#8EA4B6; --c7:#E087A8; --c8:#5CC0D4; --c9:#6E7B75;
   --bench:#9AA9A3; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0D1311; --surface:#151D1A; --ink:#E5ECE8; --muted:#92A09A; --line:#25302C; --soft:#1B2521;
   --accent:#3FC3AA; --accent-ink:#06201B; --gain:#4CC27F; --loss:#F0786B; --warn:#E0A64A;
-  --c1:#3FC3AA; --c2:#6B9BE0; --c3:#A98BD6; --c4:#E0AC3A; --c5:#C19C6C; --c6:#8EA4B6; --c7:#6E7B75;
+  --c1:#3FC3AA; --c2:#6B9BE0; --c3:#A98BD6; --c4:#E0AC3A; --c5:#C19C6C; --c6:#8EA4B6; --c7:#E087A8; --c8:#5CC0D4; --c9:#6E7B75;
   --bench:#9AA9A3; color-scheme:dark}
 body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.5;padding-inline:clamp(16px,3vw,32px);padding-block:20px 56px}
 *{box-sizing:border-box}
@@ -202,7 +202,7 @@ section[hidden]{display:none!important}
           <button class="btn" type="submit">Add</button>
         </form>
         <div class="msg" id="txnMsg"></div>
-        <p class="note">Typing a symbol fills in the name, asset class and sector using Claude's general knowledge, so check them. Prices are not looked up: enter the current price for a new symbol, and import a price history on the Data tab for risk and benchmark statistics.</p>
+        <p class="note">Typing a symbol fills in the name, asset class and sector using Claude's general knowledge, so check them. Futures and options are valued as quantity times price, and short positions and margin are not modelled. Prices are not looked up: enter the current price for a new symbol, and import a price history on the Data tab for risk and benchmark statistics.</p>
       </div>
     </details>
     <details id="priceBox">
@@ -274,7 +274,7 @@ section[hidden]{display:none!important}
         <div>
           <b>Transactions</b>
           <pre class="code">date,symbol,type,qty,price,class,name,fund
-2026-01-12,TCS,BUY,10,3950,Equity,Tata Consultancy,Large Cap</pre>
+2026-01-12,TCS,BUY,10,3950,Equities,Tata Consultancy,Large Cap</pre>
         </div>
         <div>
           <b>Price history</b>
@@ -283,7 +283,7 @@ section[hidden]{display:none!important}
 2026-01-12,NIFTY50,24890.1</pre>
         </div>
       </div>
-      <p class="note">Dates may be YYYY-MM-DD, DD-MM-YYYY or DD/MM/YYYY. The optional fund column puts a transaction in that fund and creates the fund if it is new. Add class "Index" to price rows to mark a benchmark. Mutual fund NAVs and FD values go in as price history too.</p>
+      <p class="note">Dates may be YYYY-MM-DD, DD-MM-YYYY or DD/MM/YYYY. The optional fund column puts a transaction in that fund and creates the fund if it is new. Classes: Equities, Futures, Options, Commodities, REIT, InvIT, Money Market Funds, Long Term Fixed Income. Common names such as stock, ETF, gold, liquid or FD are mapped for you. Add class "Index" to price rows to mark a benchmark. Mutual fund NAVs and FD values go in as price history too.</p>
       <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
         <textarea id="csvIn" placeholder="Paste CSV here"></textarea>
         <div class="cols" style="align-items:center">
@@ -425,11 +425,22 @@ const fmtD=s=>{const p=s.split('-');return +p[2]+' '+MON[+p[1]-1]+' '+p[0]};
 const fmtM=s=>MON[+s.slice(5,7)-1]+' '+s.slice(2,4);
 
 /* ---------- constants ---------- */
-const CLASSES=['Equity','ETF','Mutual Fund','Gold','Debt','Fixed Deposit','Other'];
+const CLASSES=['Equities','Futures','Options','Commodities','REIT','InvIT','Money Market Funds','Long Term Fixed Income','Other'];
+const CLASS_ALIASES={equity:'Equities',equities:'Equities',stock:'Equities',stocks:'Equities',share:'Equities',shares:'Equities',etf:'Equities','mutual fund':'Equities',mf:'Equities',
+  future:'Futures',futures:'Futures',fut:'Futures',option:'Options',options:'Options',opt:'Options',
+  commodity:'Commodities',commodities:'Commodities',gold:'Commodities',silver:'Commodities',reit:'REIT',reits:'REIT',invit:'InvIT',invits:'InvIT',
+  'money market':'Money Market Funds','money market fund':'Money Market Funds','money market funds':'Money Market Funds',mmf:'Money Market Funds',liquid:'Money Market Funds','liquid fund':'Money Market Funds',
+  debt:'Long Term Fixed Income',bond:'Long Term Fixed Income',bonds:'Long Term Fixed Income',fd:'Long Term Fixed Income','fixed deposit':'Long Term Fixed Income','fixed income':'Long Term Fixed Income','long term fixed income':'Long Term Fixed Income',gilt:'Long Term Fixed Income',other:'Other'};
+function normClass(c){
+  const k=String(c==null?'':c).trim().toLowerCase();
+  if(!k)return null;
+  const exact=CLASSES.find(x=>x.toLowerCase()===k);
+  return exact||CLASS_ALIASES[k]||null;
+}
 const clsColor=c=>'var(--c'+(Math.max(0,CLASSES.indexOf(c))+1)+')';
 const PERIODS=['1M','3M','6M','YTD','1Y','All'];
 const LS='portfolio-desk.v1';
-const DEMO_TARGETS={'Equity':40,'ETF':15,'Mutual Fund':20,'Gold':10,'Debt':10,'Fixed Deposit':5};
+const DEMO_TARGETS={'Equities':50,'Commodities':10,'REIT':5,'InvIT':5,'Money Market Funds':10,'Long Term Fixed Income':20};
 
 /* ---------- time in IST ---------- */
 function istNow(){
@@ -453,18 +464,20 @@ const DEMO_SYMS=[
   {s:'SENSEX',n:'Sensex',c:'Index',p0:75100,b:1,idio:.0006,dr:.12},
   {s:'NIFTYMID150',n:'Nifty Midcap 150',c:'Index',p0:19900,b:1.15,idio:.0042,dr:.15},
   {s:'NIFTYSMALL250',n:'Nifty Smallcap 250',c:'Index',p0:14800,b:1.3,idio:.004,dr:.17},
-  {s:'RELIANCE',n:'Reliance Industries',c:'Equity',p0:1250,b:1,idio:.011,dr:.08},
-  {s:'HDFCBANK',n:'HDFC Bank',c:'Equity',p0:1620,b:.95,idio:.0095,dr:.1},
-  {s:'TCS',n:'Tata Consultancy Services',c:'Equity',p0:3900,b:.65,idio:.011,dr:.06},
-  {s:'ICICIBANK',n:'ICICI Bank',c:'Equity',p0:1120,b:1.05,idio:.0105,dr:.13},
-  {s:'ITC',n:'ITC',c:'Equity',p0:430,b:.6,idio:.0095,dr:.09},
-  {s:'NIFTYBEES',n:'Nifty 50 ETF',c:'ETF',p0:245,b:1,idio:.0006,dr:.12},
-  {s:'GOLDBEES',n:'Gold ETF',c:'Gold',p0:62,b:.04,idio:.0075,dr:.14},
-  {s:'FLEXICAP',n:'Example Flexi Cap Fund',c:'Mutual Fund',p0:78,b:.85,idio:.0042,dr:.13},
-  {s:'MIDCAPFUND',n:'Example Midcap Fund',c:'Mutual Fund',p0:95,b:1.12,idio:.0045,dr:.16},
-  {s:'SMALLCAPFUND',n:'Example Smallcap Fund',c:'Mutual Fund',p0:140,b:1.25,idio:.006,dr:.17},
-  {s:'DEBTFUND',n:'Example Short Duration Fund',c:'Debt',p0:1050,b:0,idio:.0004,dr:.068},
-  {s:'BANKFD',n:'Bank fixed deposit',c:'Fixed Deposit',p0:1000,b:0,idio:0,dr:.071,fixed:true}
+  {s:'RELIANCE',n:'Reliance Industries',c:'Equities',p0:1250,b:1,idio:.011,dr:.08},
+  {s:'HDFCBANK',n:'HDFC Bank',c:'Equities',p0:1620,b:.95,idio:.0095,dr:.1},
+  {s:'TCS',n:'Tata Consultancy Services',c:'Equities',p0:3900,b:.65,idio:.011,dr:.06},
+  {s:'ICICIBANK',n:'ICICI Bank',c:'Equities',p0:1120,b:1.05,idio:.0105,dr:.13},
+  {s:'ITC',n:'ITC',c:'Equities',p0:430,b:.6,idio:.0095,dr:.09},
+  {s:'NIFTYBEES',n:'Nifty 50 ETF',c:'Equities',p0:245,b:1,idio:.0006,dr:.12},
+  {s:'GOLDBEES',n:'Gold ETF',c:'Commodities',p0:62,b:.04,idio:.0075,dr:.14},
+  {s:'FLEXICAP',n:'Example Flexi Cap Fund',c:'Equities',p0:78,b:.85,idio:.0042,dr:.13},
+  {s:'MIDCAPFUND',n:'Example Midcap Fund',c:'Equities',p0:95,b:1.12,idio:.0045,dr:.16},
+  {s:'SMALLCAPFUND',n:'Example Smallcap Fund',c:'Equities',p0:140,b:1.25,idio:.006,dr:.17},
+  {s:'DEBTFUND',n:'Example Liquid Fund',c:'Money Market Funds',p0:1050,b:0,idio:.0004,dr:.068},
+  {s:'REITEX',n:'Example REIT',c:'REIT',p0:380,b:.35,idio:.006,dr:.09},
+  {s:'INVITEX',n:'Example InvIT',c:'InvIT',p0:110,b:.15,idio:.004,dr:.1},
+  {s:'BANKFD',n:'Bank fixed deposit',c:'Long Term Fixed Income',p0:1000,b:0,idio:0,dr:.071,fixed:true}
 ];
 function buildDemo(){
   const today=istNow().date;
@@ -492,12 +505,13 @@ function buildDemo(){
   const L='f1',M='f2',Sm='f3',D='f4';
   add('RELIANCE',22,40,'BUY',L);add('HDFCBANK',22,30,'BUY',L);add('TCS',24,12,'BUY',L);add('ICICIBANK',30,45,'BUY',L);
   add('ITC',30,120,'BUY',L);add('NIFTYBEES',34,300,'BUY',L);add('GOLDBEES',36,900,'BUY',D);add('DEBTFUND',40,35,'BUY',D);
-  add('BANKFD',40,150,'BUY',D);add('TCS',140,8,'BUY',L);add('RELIANCE',210,25,'BUY',L);add('ICICIBANK',250,30,'BUY',L);
+  add('BANKFD',40,150,'BUY',D);add('REITEX',70,400,'BUY',D);add('INVITEX',90,1000,'BUY',D);add('REITEX',280,200,'BUY',D);add('TCS',140,8,'BUY',L);add('RELIANCE',210,25,'BUY',L);add('ICICIBANK',250,30,'BUY',L);
   add('ITC',300,50,'SELL',L);add('NIFTYBEES',330,200,'BUY',L);add('GOLDBEES',360,400,'BUY',D);add('HDFCBANK',372,20,'BUY',L);
   for(let k=0;k<11;k++)add('FLEXICAP',44+k*32,260,'BUY',M);
   add('MIDCAPFUND',50,1500,'BUY',M);add('MIDCAPFUND',200,1200,'BUY',M);
   add('SMALLCAPFUND',60,900,'BUY',Sm);add('SMALLCAPFUND',180,700,'BUY',Sm);add('SMALLCAPFUND',320,600,'BUY',Sm);
-  return {series,meta,txns,beta,idio};
+  const fixed={};for(const d of DEMO_SYMS)fixed[d.s]=!!d.fixed;
+  return {series,meta,txns,beta,idio,fixed};
 }
 
 /* ---------- state ---------- */
@@ -505,11 +519,16 @@ let S=null,DEMO_AUX=null;
 const FEED={meta:{},updated:''};
 function blank(){return {mode:'user',ver:2,txns:[],meta:{},series:{},manual:{},live:{},bench:'',rf:7,targets:{},feedUrl:'',period:'1Y',sort:{k:'value',dir:-1},nextId:1,funds:[{id:'f1',name:'Main',bench:''}],view:'ALL'}}
 function demoState(){
-  const d=buildDemo();DEMO_AUX={beta:d.beta,idio:d.idio};
+  const d=buildDemo();DEMO_AUX={beta:d.beta,idio:d.idio,fixed:d.fixed};
   return {mode:'demo',ver:2,txns:d.txns,meta:d.meta,series:d.series,manual:{},live:{},bench:'NIFTY50',rf:7,targets:{ALL:Object.assign({},DEMO_TARGETS)},feedUrl:'',period:'1Y',sort:{k:'value',dir:-1},nextId:d.txns.length+1,
     funds:[{id:'f1',name:'Large Cap',bench:'NIFTY50'},{id:'f2',name:'Mid Cap',bench:'NIFTYMID150'},{id:'f3',name:'Small Cap',bench:'NIFTYSMALL250'},{id:'f4',name:'Defensive',bench:''}],view:'ALL'};
 }
 function normalize(){
+  if(!S.targets)S.targets={};
+  const tk0=Object.keys(S.targets);
+  if(tk0.length&&typeof S.targets[tk0[0]]==='number')S.targets={ALL:S.targets};
+  for(const s in S.meta){const m=S.meta[s];if(m&&m.cls&&m.cls!=='Index'){m.cls=normClass(m.cls)||'Other'}}
+  for(const v in S.targets){const t=S.targets[v];if(t&&typeof t==='object'){const o={};for(const c in t){const k=normClass(c)||c;o[k]=(o[k]||0)+t[c]}S.targets[v]=o}}
   if(!Array.isArray(S.funds)||!S.funds.length)S.funds=[{id:'f1',name:'Main',bench:''}];
   for(const t of S.txns)if(!t.fund||!S.funds.some(f=>f.id===t.fund))t.fund=S.funds[0].id;
   const tk=Object.keys(S.targets||{});
@@ -540,7 +559,7 @@ function initSim(){
   const m0=.0018*gauss(r);simM=m0;
   for(const s in S.series){
     const c=S.series[s].c,prev=c[c.length-1],b=DEMO_AUX.beta[s]||0,id=DEMO_AUX.idio[s]||0;
-    const fixed=S.meta[s]&&S.meta[s].cls==='Fixed Deposit';
+    const fixed=DEMO_AUX.fixed[s];
     S.live[s]=fixed?prev*(1+.071/365):prev*(1+b*m0+id*.5*gauss(r));
   }
 }
@@ -551,7 +570,7 @@ function simTick(){
   if(!Object.keys(S.live).length){initSim();return}
   const m=.00035*gauss(Math.random);
   for(const s in S.live){
-    const fixed=S.meta[s]&&S.meta[s].cls==='Fixed Deposit';
+    const fixed=DEMO_AUX.fixed[s];
     if(fixed)continue;
     const b=DEMO_AUX.beta[s]||0,id=DEMO_AUX.idio[s]||0;
     S.live[s]*=1+b*m+id*.1*gauss(Math.random);
@@ -1009,9 +1028,9 @@ function importCSV(text){
       if(!date||!sym||!(qty>0)||!(price>=0)){bad++;continue}
       S.txns.push({id:S.nextId++,date,symbol:sym,type,qty,price,fund:fundOf(iFund>=0?x[iFund]:'')});ok++;
       const cl=iCls>=0?String(x[iCls]).trim():'';
-      const cls=CLASSES.find(c=>c.toLowerCase()===cl.toLowerCase())||(cl.toLowerCase()==='index'?'Index':null);
+      const cls=normClass(cl)||(cl.toLowerCase()==='index'?'Index':null);
       const old=S.meta[sym]||{};
-      S.meta[sym]={name:(iName>=0&&String(x[iName]).trim())||old.name||sym,cls:cls||old.cls||'Equity',sector:old.sector||''};
+      S.meta[sym]={name:(iName>=0&&String(x[iName]).trim())||old.name||sym,cls:cls||old.cls||'Equities',sector:old.sector||''};
       if(!S.series[sym]){S.series[sym]={d:[date],c:[price]};seen.add(sym)}
     }
     if(seen.size)warns.push('No price history for '+[...seen].join(', ')+'. They are valued at the transaction price until you import prices or set a price by hand.');
@@ -1022,7 +1041,7 @@ function importCSV(text){
       if(!date||!sym||!(v>=0)){bad++;continue}
       (bySym[sym]||(bySym[sym]=new Map())).set(date,v);ok++;
       if(iCls>=0&&String(x[iCls]).trim().toLowerCase()==='index'){S.meta[sym]=Object.assign({name:sym},S.meta[sym],{cls:'Index'})}
-      if(iName>=0&&String(x[iName]).trim()){S.meta[sym]=Object.assign({cls:'Equity'},S.meta[sym],{name:String(x[iName]).trim()})}
+      if(iName>=0&&String(x[iName]).trim()){S.meta[sym]=Object.assign({cls:'Equities'},S.meta[sym],{name:String(x[iName]).trim()})}
     }
     for(const sym in bySym){
       const old=S.series[sym],mp=new Map();
@@ -1030,7 +1049,7 @@ function importCSV(text){
       for(const [d,v] of bySym[sym])mp.set(d,v);
       const ds=[...mp.keys()].sort();
       S.series[sym]={d:ds,c:ds.map(d=>mp.get(d))};
-      if(!S.meta[sym])S.meta[sym]={name:sym,cls:/^(\^|NIFTY\d|SENSEX)/i.test(sym)?'Index':'Equity'};
+      if(!S.meta[sym])S.meta[sym]={name:sym,cls:/^(\^|NIFTY\d|SENSEX)/i.test(sym)?'Index':'Equities'};
     }
   }
   if(!S.bench){const c=benchCandidates();if(c.length)S.bench=c[0]}
@@ -1113,10 +1132,10 @@ async function lookupSymbol(){
   if(!sample){msg(M,'Symbol lookup is not available in this view. Enter the name and class by hand.','');return}
   msg(M,'Looking up '+sym+'…','');
   try{
-    const r=await sample.json('Identify the Indian listed security or fund with the NSE or BSE symbol "'+sym+'". Reply with JSON only, in this shape: {"name": string or null, "assetClass": one of ["Equity","ETF","Mutual Fund","Gold","Debt","Fixed Deposit","Other"], "sector": string or null}. Use null for name if you are not confident the symbol exists. Gold ETFs are "Gold". Do not include prices.',{modelTier:'quick'});
+    const r=await sample.json('Identify the Indian listed security or fund with the NSE or BSE symbol "'+sym+'". Reply with JSON only, in this shape: {"name": string or null, "assetClass": one of ["Equities","Futures","Options","Commodities","REIT","InvIT","Money Market Funds","Long Term Fixed Income","Other"], "sector": string or null}. Use null for name if you are not confident the symbol exists. Shares, equity ETFs and equity mutual funds are "Equities". Gold and silver ETFs are "Commodities". Liquid and overnight funds are "Money Market Funds". Bond funds, G-secs and fixed deposits are "Long Term Fixed Income". Do not include prices.',{modelTier:'quick'});
     if(!r||!r.name){msg(M,'Could not identify '+sym+'. Enter the name and class by hand.','err');return}
     $('#fName').value=String(r.name);
-    if(CLASSES.includes(r.assetClass))$('#fCls').value=r.assetClass;
+    {const ac=normClass(r.assetClass);if(ac)$('#fCls').value=ac}
     lookedUp[sym]={sector:r.sector?String(r.sector):''};
     msg(M,'Filled '+r.name+(r.sector?' · '+r.sector:'')+' from Claude\'s general knowledge. Check it, then enter the price.','ok');
     if(!$('#fPrice').value)$('#fPrice').focus();
