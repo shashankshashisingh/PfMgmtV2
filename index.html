@@ -239,7 +239,7 @@ section[hidden]{display:none!important}
     <div class="panel">
       <h2>Holdings</h2>
       <div class="tw" id="holdTable"></div>
-      <p class="note">Holdings are bundled under their asset class, and the class row adds them up. Click a class to fold it. Average cost uses first-in, first-out lots, and day change compares the last price with the previous close. Sorting applies inside each class.</p>
+      <p class="note">Holdings are separated into Long positions and Short positions, then grouped by asset class. Click an asset-class row to fold it. Average cost uses first-in, first-out lots, and day change compares the last price with the previous close. Sorting applies inside each class.</p>
     </div>
     <details id="addBox">
       <summary>Add a transaction</summary>
@@ -987,18 +987,22 @@ function spark(vals){
 const COLLAPSED={};
 function renderHoldings(){
   const h=C.held||[];
-  if(!h.length){$('#holdTable').innerHTML=emptyMsg();return}
   const k=S.sort.k,dir=S.sort.dir;
   const cmp=(a,b)=>{const x=a[k],y=b[k];return (typeof x==='string'?x.localeCompare(y):(x-y))*dir};
   const cols=[['name','Instrument',0],['qty','Qty',1],['avg','Avg cost',1],['ltp','Last price',1],['dayPct','Day',1],['dayPnl','Day P&L',1],['value','Value',1],['unreal','Profit',1],['unrealPct','Return',1],['w','Weight',1]];
   const groups={};for(const p of h)(groups[p.cls]||(groups[p.cls]=[])).push(p);
-  const order=CLASSES.filter(c=>groups[c]).concat(Object.keys(groups).filter(c=>!CLASSES.includes(c)));
+  const sides=[{key:'LONG',label:'Long positions',items:h.filter(p=>p.side!=='SHORT')},{key:'SHORT',label:'Short positions',items:h.filter(p=>p.side==='SHORT')}];
   let body='';
-  for(const c of order){
-    const g=groups[c].slice().sort(cmp);
-    const val=sum(g.map(p=>p.value)),cost=sum(g.map(p=>p.cost)),day=sum(g.map(p=>p.dayPnl)),un=val-cost,w=sum(g.map(p=>p.w));
-    const dayPct=val-day>0?day/(val-day):0,open=!COLLAPSED[c];
-    body+='<tr class="grp"><td><button class="grpbtn" data-grp="'+esc(c)+'" aria-expanded="'+open+'"><span aria-hidden="true">'+(open?'▾':'▸')+'</span><span class="swatch" style="background:'+clsColor(c)+';margin:0"></span>'+esc(c)+' <span class="cnt">'+g.length+(g.length===1?' holding':' holdings')+'</span></button></td>'+
+  if(!h.length)body='<tr><td colspan="11">'+emptyMsg()+'</td></tr>';
+  for(const side of sides){
+    const sideGroups={};for(const p of side.items)(sideGroups[p.cls]||(sideGroups[p.cls]=[])).push(p);
+    body+='<tr class="grp"><td colspan="11" style="padding:12px 10px;font-weight:700;background:var(--panel2)">'+side.label+' <span class="cnt">'+side.items.length+(side.items.length===1?' position':' positions')+'</span></td></tr>';
+    const order=CLASSES.filter(c=>sideGroups[c]).concat(Object.keys(sideGroups).filter(c=>!CLASSES.includes(c)));
+    for(const c of order){
+      const g=sideGroups[c].slice().sort(cmp);
+      const val=sum(g.map(p=>p.value)),cost=sum(g.map(p=>p.cost)),day=sum(g.map(p=>p.dayPnl)),un=sum(g.map(p=>p.unreal)),w=sum(g.map(p=>p.w));
+      const dayPct=val-day>0?day/(val-day):0,groupKey=side.key+':'+c,open=!COLLAPSED[groupKey];
+      body+='<tr class="grp"><td><button class="grpbtn" data-grp="'+esc(groupKey)+'" aria-expanded="'+open+'"><span aria-hidden="true">'+(open?'▾':'▸')+'</span><span class="swatch" style="background:'+clsColor(c)+';margin:0"></span>'+esc(c)+' <span class="cnt">'+g.length+(g.length===1?' holding':' holdings')+'</span></button></td>'+
       '<td></td><td></td><td></td><td class="n '+sg(day)+'">'+pcS(dayPct)+'</td><td class="n '+sg(day)+'">'+inrS(day)+'</td><td class="n">'+inr(val)+'</td><td class="n '+sg(un)+'">'+inrS(un)+'</td><td class="n '+sg(un)+'">'+pcS(cost?val/cost-1:NaN)+'</td><td class="n">'+pc(w,1)+'</td><td></td></tr>';
     if(open)for(const p of g){const sp=spark((C.px[p.s]||[]).slice(-30));
       body+='<tr class="sec"><td><div class="ins"><b>'+esc(p.name)+(p.side==='SHORT'?' <span class="loss">· SHORT</span>':'')+'</b><small>'+esc(p.s)+(p.sector?' · '+esc(p.sector):'')+'</small></div></td>'+
