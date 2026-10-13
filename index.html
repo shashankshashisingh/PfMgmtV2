@@ -1070,8 +1070,13 @@ function renderFunds(){
   const cell=(r,i)=>{
     const has=r.T.value>0||r.count>0,T=r.T,st=r.st,ex=has&&isFinite(st.total)&&isFinite(r.sb.total)?st.total-r.sb.total:NaN;
     const nameCell=i>=0?'<span class="swatch" style="background:var(--c'+(i%7+1)+')"></span><button class="chip" data-fundsel="'+esc(r.f.id)+'">'+esc(r.f.name)+'</button>':'<b>All funds</b>';
+    const assetBase=i<0?sum(rows.map(x=>Number(x.f.totalAssets)||0)):(Number(r.f.totalAssets)||0);
+    const longValue=sum((r.A.held||[]).filter(p=>p.side!=='SHORT').map(p=>p.value));
+    const marginUsed=longValue+(r.A.shortMargin||0);
+    const remaining=assetBase-marginUsed;
     return '<tr'+(i<0?' style="font-weight:600"':'')+'><td>'+nameCell+'</td><td>'+esc(r.b||'—')+'</td>'+
       '<td class="n">'+(has?inrC(T.value):'—')+'</td><td class="n">'+(tot>0&&has?pc(T.value/tot,1):'—')+'</td>'+
+      '<td class="n">'+(assetBase>0?inrC(assetBase):'—')+'</td><td class="n">'+(assetBase>0?inrC(marginUsed):'—')+'</td><td class="n '+(remaining<0?'loss':'')+'">'+(assetBase>0?inrS(remaining):'—')+'</td>'+
       '<td class="n '+sg(T.dayPnl)+'">'+(has?pcS(T.dayPct):'—')+'</td>'+
       '<td class="n '+sg(st.total)+'">'+pcS(st.total)+'</td><td class="n '+sg(ex)+'">'+pcS(ex)+'</td>'+
       '<td class="n '+sg(T.xirr)+'">'+pcS(T.xirr,1)+'</td><td class="n">'+pc(st.vol)+'</td><td class="n">'+nm(st.sharpe)+'</td>'+
