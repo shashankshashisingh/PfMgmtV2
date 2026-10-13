@@ -733,8 +733,8 @@ function range(){return rangeFor(C)}
 function renderStatus(){
   const ist=C.ist||istNow();
   const state=ist.open?'Market open':ist.preopen?'Pre-open':'Market closed';
-  const feed=S.mode==='demo'?(FEED.updated?'Live quotes + simulated fallback':'Simulated prices'):S.feedUrl?'Live feed':'Manual and imported prices';
-  const upd=S.mode==='user'&&S.feedUrl&&FEED.updated?' · '+new Date(FEED.updated).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Kolkata'}):'';
+  const feed=FEED.raw?.source|| (S.mode==='demo'?(FEED.updated?'NSE Bhavcopy + simulated fallback':'Simulated prices'):S.feedUrl?'NSE Bhavcopy':'Manual and imported prices');
+  const upd=FEED.updated?' · data updated '+new Date(FEED.updated).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Kolkata'}):'';
   $('#status').innerHTML='<span class="pill"><span class="dot '+(ist.open?'open':'')+'"></span>NSE '+state+'</span><span class="pill">'+esc(feed+upd)+'</span><span class="mono">'+ist.stamp+' IST</span>';
 }
 function renderBanner(){
@@ -1284,9 +1284,9 @@ function renderRepoStatus(){
   const noFeed=S.mode==='user'&&FEED.raw&&FEED.raw.prices?heldSyms.filter(s=>!FEED.raw.prices[s]):[];
   const pOk=REPO.priceCount>0&&!!REPO.priceUpdated;
   el.innerHTML=
-    line(pOk,'Live prices',pOk?REPO.priceCount+' symbols, updated '+ago(REPO.priceUpdated)+(S.mode==='demo'?'. The example portfolio uses simulated prices.':''):(REPO.priceErr?'could not read data/prices.json ('+esc(REPO.priceErr)+')':'data/prices.json is empty. In your repo, open Actions and run "Update prices".'))+
-    line(REPO.dirCount>0,'Symbol list',REPO.dirCount>0?REPO.dirCount.toLocaleString('en-IN')+' symbols for lookup':(REPO.dirErr?'could not read data/directory.json ('+esc(REPO.dirErr)+')':'not built yet. It is created by the same "Update prices" run.'))+
-    line(REPO.histCount>0,'Price history',REPO.histCount>0?REPO.histCount+' series, updated '+ago(REPO.histUpdated):(REPO.histErr?'could not read data/history.json ('+esc(REPO.histErr)+')':'empty. Run "Update price history" in Actions. It feeds the statistics and benchmark tabs.'))+
+    line(pOk,'NSE Bhavcopy prices',pOk?REPO.priceCount+' symbols, updated '+ago(REPO.priceUpdated)+'. End-of-day close, not an intraday live feed.':(REPO.priceErr?'could not read data/prices.json ('+esc(REPO.priceErr)+')':'data/prices.json is empty. In your repo, open Actions and run "Update NSE Bhavcopy".'))+
+    line(REPO.dirCount>0,'Symbol list',REPO.dirCount>0?REPO.dirCount.toLocaleString('en-IN')+' symbols for lookup':(REPO.dirErr?'could not read data/directory.json ('+esc(REPO.dirErr)+')':'not built yet. It is created by the "Update NSE Bhavcopy" run.'))+
+    line(REPO.histCount>0,'Price history',REPO.histCount>0?REPO.histCount+' series, updated '+ago(REPO.histUpdated):(REPO.histErr?'could not read data/history.json ('+esc(REPO.histErr)+')':'empty. Run "Update NSE Bhavcopy" in Actions to append closing prices; historical data feeds statistics and benchmark tabs.'))+
     (bulkBlocked?'<p class="note">NSE refuses the bulk quote call from GitHub, so live prices come one symbol at a time and only for symbols listed in <span class="mono">symbols.json</span>. Today\'s benchmark level is also missing, so benchmark statistics stop at the last close.</p>':'')+
     (noFeed.length?'<p class="note loss">No live price yet for '+noFeed.map(esc).join(', ')+'. Add '+(noFeed.length>1?'them':'it')+' to <span class="mono">symbols.json</span> in your repo (use Copy symbols.json below) and the next run picks '+(noFeed.length>1?'them':'it')+' up.</p>':'')+
     (errs?'<p class="note">Last job reported: '+errs+'</p>':'')+
