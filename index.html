@@ -152,6 +152,13 @@ section[hidden]{display:none!important}
   <section id="tab-today" class="stack">
     <div class="strip" id="kpis"></div>
     <div class="panel">
+      <h2>Fund NAV <span class="hint">₹1 crore corpus · 100,000 units per fund</span></h2>
+      <div id="navCards" class="grid3"></div>
+      <div class="legend" id="navLegend" style="margin-top:14px"></div>
+      <div class="chart" id="navChart"></div>
+      <p class="note">NAV = (market value of holdings + cash balance) ÷ 100,000. Unused corpus remains as cash with no assumed interest. Cash is reduced by buys and increased by sells; negative cash indicates transactions exceed the assumed corpus. NAV history uses available price history.</p>
+    </div>
+    <div class="panel">
       <h2>Portfolio value <span class="hint" id="valHint"></span></h2>
       <div class="legend"><span><i style="background:var(--accent)"></i>Market value</span><span><i style="background:var(--bench)"></i>Net invested</span></div>
       <div class="chart" id="valChart"></div>
@@ -744,7 +751,49 @@ function renderPeriod(){
   el.innerHTML='<span class="lbl">Period</span>'+PERIODS.map(p=>'<button class="chip" data-per="'+p+'" aria-pressed="'+(S.period===p)+'">'+p+'</button>').join('');
 }
 function emptyMsg(){return '<div class="empty">No holdings yet. Add a transaction on the Holdings tab or import a CSV on the Data tab.</div>'}
+const FUND_CORPUS=10000000;
+const FUND_UNITS=100000;
+function fundNavData(){
+  return S.funds.map((f,i)=>{
+    const tx=S.txns.filter(t=>t.fund===f.id);
+    const A=analyze(tx,C.px,C.dates,C.n);
+    const cash=A.ps.invested.map(v=>FUND_CORPUS-v);
+    const assets=A.ps.value.map((v,j)=>v+cash[j]);
+    const nav=assets.map(v=>v/FUND_UNITS);
+    const last=Math.max(0,nav.length-1);
+    return {f,i,tx,A,cash,assets,nav,current:nav.length?nav[last]:100,
+      cashNow:cash.length?cash[last]:FUND_CORPUS,assetsNow:assets.length?assets[last]:FUND_CORPUS,
+      returnPct:(nav.length?nav[last]/100-1:0)};
+  });
+}
+function renderNav(){
+  const rows=fundNavData();
+  const shown=S.view==='ALL'?rows:rows.filter(r=>r.f.id===S.view);
+  const color=i=>'var(--c'+(i%7+1)+')';
+  $('#navCards').innerHTML=shown.map(r=>
+    '<div class="panel" style="padding:12px;border-color:var(--line)">'+
+      '<div class="k">'+esc(r.f.name)+'</div>'+
+      '<div class="v big '+sg(r.current-100)+'">'+inr(r.current,2)+'</div>'+
+      '<div class="s '+sg(r.returnPct)+'">'+pcS(r.returnPct)+' since ₹100 start</div>'+
+      '<div class="note" style="display:flex;justify-content:space-between;gap:8px"><span>Assets</span><b class="mono">'+inrC(r.assetsNow)+'</b></div>'+
+      '<div class="note" style="display:flex;justify-content:space-between;gap:8px;margin-top:2px"><span>Cash balance</span><b class="mono">'+inrC(r.cashNow)+'</b></div>'+
+      '<div class="note" style="display:flex;justify-content:space-between;gap:8px;margin-top:2px"><span>Units</span><b class="mono">'+nf0.format(FUND_UNITS)+'</b></div>'+
+    '</div>'
+  ).join('');
+  $('#navLegend').innerHTML=shown.map(r=>'<span><i style="background:'+color(r.i)+'"></i>'+esc(r.f.name)+'</span>').join('');
+  const from=C.dates.length?periodStart(C.dates,S.period==='All'?'ALL':S.period):0;
+  const dates=C.dates.slice(from);
+  const series=shown.map(r=>({name:r.f.name,color:color(r.i),vals:r.nav.slice(from),w:2}));
+  if(!dates.length){
+    $('#navChart').innerHTML='<div class="empty">NAV starts at ₹100 per unit. A graph will appear when price-history dates are available.</div>';
+  }else if(dates.length===1){
+    $('#navChart').innerHTML='<div class="empty">NAV is '+inr(shown[0]?.current??100,2)+' for the available date '+esc(fmtD(dates[0]))+'. More price-history dates are needed to draw a line.</div>';
+  }else{
+    lineChart($('#navChart'),dates,series,{yf:v=>'₹'+nf2.format(v),label:'Fund NAV per unit over time',yw:70});
+  }
+}
 function renderToday(){
+  renderNav();
   const T=totals(),h=C.held;
   if(!h.length){$('#kpis').innerHTML='';$('#valChart').innerHTML=emptyMsg();$('#allocBox').innerHTML=emptyMsg();$('#movers').innerHTML=emptyMsg();return}
   const totalRet=T.unreal+T.realised;
